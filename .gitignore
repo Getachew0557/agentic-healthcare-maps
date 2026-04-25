@@ -33,3 +33,6 @@ data/exports/
 # API keys 
 .env 
 config.py 
+
+# Test artifacts
+backend/test_admin.db

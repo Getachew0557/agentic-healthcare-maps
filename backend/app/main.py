@@ -1,14 +1,76 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.security import HTTPBearer
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.services.realtime.ws_manager import redis_subscriber
+    task = asyncio.create_task(redis_subscriber(settings.redis_url))
+    logger.info("Redis availability subscriber started")
+    yield
+    task.cancel()
+
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name)
+    app = FastAPI(
+        title="Agentic Healthcare Maps API",
+        version="1.0.0",
+        description="""
+## Agentic Healthcare Maps — Backend API
+
+AI-powered hospital availability intelligence for patients and hospital staff.
+
+### Key capabilities
+- **Symptom triage** — describe symptoms in plain language (English or Hindi); Gemini extracts the required specialty and urgency level
+- **Medical citations** — Tavily searches PubMed, WHO, Mayo Clinic and returns citable sources
+- **Hospital recommendations** — ranked by travel time, specialty match, bed availability, and ventilator count
+- **Real-time availability** — hospital staff update bed counts via the secure dashboard; changes broadcast instantly via WebSocket
+- **Audit trail** — every availability change is logged with old/new values and the user who made it
+
+### Authentication
+Protected endpoints require a **Bearer JWT** token obtained from `POST /api/v1/auth/login`.
+
+```
+Authorization: Bearer <token>
+```
+
+### Roles
+| Role | Permissions |
+|---|---|
+| `hospital_staff` | Update availability for their own hospital only |
+| `admin` | Update availability for any hospital; read all logs |
+
+### Decision-support disclaimer
+This system provides decision-support only. It does not diagnose medical conditions.
+        """,
+        contact={
+            "name": "Team Getachew0557",
+            "url": "https://github.com/Getachew0557/agentic-healthcare-maps",
+        },
+        license_info={"name": "MIT"},
+        lifespan=lifespan,
+        openapi_tags=[
+            {"name": "health", "description": "Service liveness check"},
+            {"name": "auth", "description": "Register, login, and inspect the current user"},
+            {"name": "patient", "description": "Symptom triage and hospital recommendations — public, no auth required"},
+            {"name": "hospitals", "description": "Hospital directory — public read access"},
+            {"name": "admin", "description": "Hospital availability updates and audit logs — requires JWT"},
+            {"name": "realtime", "description": "WebSocket channel for live availability events"},
+        ],
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -19,6 +81,33 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router, prefix="/api/v1")
+
+    # Inject BearerAuth security scheme into OpenAPI spec
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            contact=app.contact,
+            license_info=app.license_info,
+            tags=app.openapi_tags,
+            routes=app.routes,
+        )
+        schema.setdefault("components", {})
+        schema["components"]["securitySchemes"] = {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Paste the JWT token from POST /api/v1/auth/login",
+            }
+        }
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi  # type: ignore[method-assign]
     return app
 
 

@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("phone", sa.String(length=64), nullable=True),
         sa.Column("lat", sa.Float(), nullable=False),
         sa.Column("lng", sa.Float(), nullable=False),
-        sa.Column("is_24x7", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_24x7", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("status", sa.String(length=32), nullable=False, server_default="normal"),
         sa.Column("icu_total", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("icu_available", sa.Integer(), nullable=False, server_default="0"),

@@ -1,0 +1,365 @@
+{
+  "info": {
+    "name": "Agentic Healthcare Maps API",
+    "description": "Complete API collection for Agentic Healthcare Maps — AI-powered hospital availability intelligence.\n\n## Setup\n1. Import this collection into Postman\n2. Set the `base_url` variable to `http://localhost:8000`\n3. Call **Login** — the collection auto-saves the token to `{{token}}`\n4. All protected requests use `{{token}}` automatically\n\n## Decision-support disclaimer\nThis system provides decision-support only. It does not diagnose medical conditions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "agentic-healthcare-maps-v1"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "hospital_id", "value": "1", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/health",
+            "description": "Returns {status: ok} when the API is running."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"status\": \"ok\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff@hospital.com\",\n  \"password\": \"securepass123\",\n  \"role\": \"hospital_staff\",\n  \"hospital_id\": 1\n}"
+            },
+            "description": "Create a new hospital_staff or admin account.\n\n- `role`: `hospital_staff` or `admin`\n- `hospital_id`: required for hospital_staff"
+          },
+          "response": [
+            {
+              "name": "200 Created",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": 1,\n  \"email\": \"staff@hospital.com\",\n  \"role\": \"hospital_staff\",\n  \"hospital_id\": 1\n}"
+            },
+            {
+              "name": "409 Email exists",
+              "status": "Conflict",
+              "code": 409,
+              "body": "{\"detail\": \"Email already registered\"}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token', json.access_token);",
+                  "  console.log('Token saved to {{token}}');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff@hospital.com\",\n  \"password\": \"securepass123\"\n}"
+            },
+            "description": "Authenticate and receive a JWT token.\n\nThe test script automatically saves the token to `{{token}}` for use in all subsequent requests."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"token_type\": \"bearer\"\n}"
+            },
+            {
+              "name": "401 Invalid credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\"detail\": \"Invalid credentials\"}"
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (me)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "description": "Returns the profile of the authenticated user."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": 1,\n  \"email\": \"staff@hospital.com\",\n  \"role\": \"hospital_staff\",\n  \"hospital_id\": 1\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Patient",
+      "item": [
+        {
+          "name": "Triage — English",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/patient/triage",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symptoms_text\": \"My mother has sudden chest pain and difficulty breathing\"\n}"
+            },
+            "description": "AI symptom triage using Google Gemini + Tavily citations.\n\nNo authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"specialty\": \"cardiology\",\n  \"urgency\": \"emergency\",\n  \"confidence\": 0.78,\n  \"rationale\": \"Symptoms suggest possible cardiac/respiratory emergency.\",\n  \"citations\": [\n    {\n      \"title\": \"AHA Guidelines on Chest Pain\",\n      \"url\": \"https://www.heart.org/en/health-topics/heart-attack\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Triage — Hindi",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/patient/triage",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symptoms_text\": \"मेरी माँ को सीने में दर्द और सांस लेने में तकलीफ हो रही है\"\n}"
+            },
+            "description": "Same triage endpoint — Gemini handles Hindi natively."
+          }
+        },
+        {
+          "name": "Triage — Fallback (no API keys)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/patient/triage",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symptoms_text\": \"high fever for 2 days\"\n}"
+            },
+            "description": "Works even without API keys — deterministic fallback rules handle common patterns."
+          }
+        },
+        {
+          "name": "Hospital Recommendations",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/patient/recommendations",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"specialty\": \"cardiology\",\n  \"urgency\": \"emergency\",\n  \"lat\": 19.076,\n  \"lng\": 72.8777,\n  \"radius_km\": 50\n}"
+            },
+            "description": "Returns top 3 hospitals ranked by weighted score.\n\nTypical flow: call /triage first, then pass specialty + urgency here.\n\n**Scoring weights (emergency):** travel 55%, specialty 25%, beds 15%, ventilators 5%"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"results\": [\n    {\n      \"hospital\": {\n        \"id\": 2,\n        \"name\": \"Kokilaben Dhirubhai Ambani Hospital\",\n        \"address\": \"Andheri West, Mumbai\",\n        \"phone\": \"+91-22-30999999\",\n        \"lat\": 19.1197,\n        \"lng\": 72.8397,\n        \"is_24x7\": true,\n        \"status\": \"normal\",\n        \"icu_total\": 60,\n        \"icu_available\": 18,\n        \"general_total\": 450,\n        \"general_available\": 120,\n        \"ventilators_available\": 12,\n        \"specialties\": [\"cardiology\", \"neurology\", \"emergency\"]\n      },\n      \"distance_km\": 4.2,\n      \"eta_minutes\": 12.5,\n      \"score_breakdown\": {\n        \"travel_score\": 0.87,\n        \"specialty_score\": 1.0,\n        \"bed_score\": 0.9,\n        \"ventilator_score\": 1.0,\n        \"total\": 0.934\n      }\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hospitals",
+      "item": [
+        {
+          "name": "List All Hospitals",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hospitals",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hospitals"],
+              "query": [
+                { "key": "specialty", "value": "", "disabled": true, "description": "Filter by specialty (partial match)" },
+                { "key": "status", "value": "", "disabled": true, "description": "normal | busy | emergency_only" },
+                { "key": "limit", "value": "200", "disabled": true }
+              ]
+            },
+            "description": "Returns all hospitals. Used by the patient map to load markers.\n\nOptional filters: specialty, status, limit."
+          }
+        },
+        {
+          "name": "List Hospitals — Filter by Specialty",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hospitals?specialty=cardiology",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hospitals"],
+              "query": [{ "key": "specialty", "value": "cardiology" }]
+            }
+          }
+        },
+        {
+          "name": "List Hospitals — Filter by Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hospitals?status=normal",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hospitals"],
+              "query": [{ "key": "status", "value": "normal" }]
+            }
+          }
+        },
+        {
+          "name": "Get Hospital by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}",
+            "description": "Returns full details for one hospital."
+          },
+          "response": [
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\"detail\": \"Hospital not found\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Update Availability — ICU + Status",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/admin/hospitals/{{hospital_id}}/availability",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"icu_available\": 3,\n  \"status\": \"busy\"\n}"
+            },
+            "description": "Update bed availability. Requires JWT.\n\n- hospital_staff: own hospital only\n- admin: any hospital\n\nTriggers WebSocket broadcast to all connected clients."
+          },
+          "response": [
+            {
+              "name": "200 OK — Updated hospital",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": 1,\n  \"name\": \"Test Hospital\",\n  \"icu_available\": 3,\n  \"status\": \"busy\"\n}"
+            },
+            {
+              "name": "422 Exceeds total",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "body": "{\"detail\": \"icu_available (999) cannot exceed icu_total (10)\"}"
+            },
+            {
+              "name": "403 Wrong hospital",
+              "status": "Forbidden",
+              "code": 403,
+              "body": "{\"detail\": \"hospital_staff can only update their own hospital\"}"
+            }
+          ]
+        },
+        {
+          "name": "Update Availability — General Beds",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/admin/hospitals/{{hospital_id}}/availability",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"general_available\": 45,\n  \"ventilators_available\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Availability Logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/hospitals/{{hospital_id}}/availability-logs?limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "admin", "hospitals", "{{hospital_id}}", "availability-logs"],
+              "query": [{ "key": "limit", "value": "20" }]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "description": "Returns audit trail of availability changes, newest first."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[\n  {\n    \"id\": 42,\n    \"hospital_id\": 1,\n    \"updated_by_user_id\": 1,\n    \"field_name\": \"icu_available\",\n    \"old_value\": \"5\",\n    \"new_value\": \"3\",\n    \"created_at\": \"2026-04-26T10:30:00Z\"\n  }\n]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WebSocket",
+      "item": [
+        {
+          "name": "Availability WebSocket",
+          "request": {
+            "method": "GET",
+            "url": "ws://localhost:8000/api/v1/ws/availability",
+            "description": "WebSocket endpoint for real-time availability updates.\n\nConnect with any WebSocket client. The server pushes events whenever hospital staff update bed counts.\n\n**Event payload:**\n```json\n{\n  \"event\": \"availability_update\",\n  \"hospital_id\": 1,\n  \"icu_available\": 3,\n  \"general_available\": 45,\n  \"ventilators_available\": 2,\n  \"status\": \"busy\"\n}\n```\n\n**Test with wscat:**\n```bash\nnpx wscat -c ws://localhost:8000/api/v1/ws/availability\n```"
+          }
+        }
+      ]
+    }
+  ]
+}
