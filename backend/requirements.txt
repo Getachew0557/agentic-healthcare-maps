@@ -1,0 +1,29 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+pydantic-settings>=2.3
+python-dotenv>=1.0
+
+# DB
+sqlalchemy>=2.0
+alembic>=1.13
+
+# Auth
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+
+# Real-time + cache
+redis>=5.0
+
+# Vector DB + embeddings (optional modules can import when needed)
+chromadb>=0.5
+sentence-transformers>=3.0
+
+# OCR + ingestion helpers
+pytesseract>=0.3
+pdf2image>=1.17
+pillow>=10.0
+
+# Geo
+geopy>=2.4
+osmnx>=1.9

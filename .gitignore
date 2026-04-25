@@ -11,16 +11,25 @@ pip-delete-this-directory.txt
 .pytest_cache/ 
 .coverage 
 *.log 
+
+# Ruff / mypy
+.ruff_cache/
+.mypy_cache/
 # IDE 
 .vscode/ 
 .idea/ 
 *.swp 
 .DS_Store 
-# Data files 
-*.csv 
-*.xlsx 
-*.json 
-data/raw/ 
+
+# Frontend
+node_modules/
+dist/
+.vite/
+
+# Data files (keep test fixtures in repo if needed)
+data/raw/
+data/processed/
+data/exports/
 # API keys 
 .env 
 config.py 
