@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.hospital import Hospital
 from app.models.specialty import HospitalSpecialty
-from app.schemas.hospital import HospitalOut
+from app.models.user import UserRole
+from app.schemas.hospital import HospitalOut, SpecialtyCreate, SpecialtyOut
 
 router = APIRouter()
 
+
+# ---------------------------------------------------------------------------
+# Internal helper — reused by patient.py and admin.py
+# ---------------------------------------------------------------------------
 
 def _build_hospital_out(hospital: Hospital, db: Session) -> HospitalOut:
     specialties = db.scalars(
@@ -34,57 +42,61 @@ def _build_hospital_out(hospital: Hospital, db: Session) -> HospitalOut:
     )
 
 
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+# ---------------------------------------------------------------------------
+# GET /hospitals
+# ---------------------------------------------------------------------------
+
 @router.get(
     "",
     response_model=list[HospitalOut],
     summary="List all hospitals",
     description="""
-Returns all hospitals in the database. Used by the patient map to load markers on initial render.
+Returns hospitals with optional filters.
 
-**Optional filters:**
+**Filters:**
 - `specialty` — case-insensitive partial match (e.g. `cardio` matches `cardiology`)
-- `status` — exact match: `normal` | `busy` | `emergency_only`
+- `status` — `normal` | `busy` | `emergency_only`
+- `lat` + `lng` + `radius_km` — geo filter using haversine distance (all three required together)
 - `limit` — max results (default 200, max 500)
 
-**Marker colour logic for the frontend:**
+**Marker colour logic:**
 | `icu_available + general_available` | Colour |
 |---|---|
 | > 10 | 🟢 Green |
 | 1–10 | 🟡 Yellow |
 | 0 | 🔴 Red |
-| unknown | ⚫ Gray |
     """,
     responses={
         200: {
             "content": {
                 "application/json": {
-                    "example": [
-                        {
-                            "id": 1,
-                            "name": "Lilavati Hospital",
-                            "address": "Bandra West, Mumbai",
-                            "phone": "+91-22-26751000",
-                            "lat": 19.0596,
-                            "lng": 72.8295,
-                            "is_24x7": True,
-                            "status": "normal",
-                            "icu_total": 40,
-                            "icu_available": 12,
-                            "general_total": 300,
-                            "general_available": 87,
-                            "ventilators_available": 8,
-                            "specialties": ["cardiology", "neurology", "emergency"],
-                        }
-                    ]
+                    "example": [{
+                        "id": 1, "name": "Lilavati Hospital",
+                        "lat": 19.0596, "lng": 72.8295,
+                        "status": "normal", "icu_available": 12,
+                        "specialties": ["cardiology", "emergency"]
+                    }]
                 }
             }
         }
     },
 )
 def list_hospitals(
-    specialty: str | None = Query(None, description="Filter by specialty name (partial match)"),
+    specialty: str | None = Query(None, description="Filter by specialty (partial match)"),
     status: str | None = Query(None, description="Filter by status: normal | busy | emergency_only"),
-    limit: int = Query(200, le=500, description="Maximum number of results"),
+    lat: float | None = Query(None, description="Patient latitude for geo filter"),
+    lng: float | None = Query(None, description="Patient longitude for geo filter"),
+    radius_km: float = Query(50.0, description="Radius in km for geo filter (requires lat+lng)"),
+    limit: int = Query(200, le=500, description="Max results"),
     db: Session = Depends(get_db),
 ):
     stmt = select(Hospital)
@@ -100,8 +112,20 @@ def list_hospitals(
 
     stmt = stmt.limit(limit)
     hospitals = db.scalars(stmt).all()
+
+    # Apply geo filter in Python (no PostGIS required for MVP scale)
+    if lat is not None and lng is not None:
+        hospitals = [
+            h for h in hospitals
+            if _haversine_km(lat, lng, h.lat, h.lng) <= radius_km
+        ]
+
     return [_build_hospital_out(h, db) for h in hospitals]
 
+
+# ---------------------------------------------------------------------------
+# GET /hospitals/{hospital_id}
+# ---------------------------------------------------------------------------
 
 @router.get(
     "/{hospital_id}",
@@ -118,3 +142,125 @@ def get_hospital(hospital_id: int, db: Session = Depends(get_db)):
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
     return _build_hospital_out(hospital, db)
+
+
+# ---------------------------------------------------------------------------
+# GET /hospitals/{hospital_id}/specialties
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{hospital_id}/specialties",
+    response_model=list[SpecialtyOut],
+    summary="List specialties for a hospital",
+    description="Returns all medical specialties offered by a hospital.",
+    responses={
+        200: {"content": {"application/json": {"example": [{"id": 1, "name": "cardiology"}, {"id": 2, "name": "emergency"}]}}},
+        404: {"description": "Hospital not found"},
+    },
+)
+def list_specialties(hospital_id: int, db: Session = Depends(get_db)):
+    hospital = db.get(Hospital, hospital_id)
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    rows = db.scalars(
+        select(HospitalSpecialty).where(HospitalSpecialty.hospital_id == hospital_id)
+    ).all()
+    return [SpecialtyOut(id=r.id, name=r.name) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# POST /hospitals/{hospital_id}/specialties
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/{hospital_id}/specialties",
+    response_model=SpecialtyOut,
+    status_code=201,
+    summary="Add a specialty to a hospital",
+    description="""
+Add a medical specialty to a hospital.
+
+**Requires JWT** — `admin` or `hospital_staff` (own hospital only).
+
+Duplicate specialty names for the same hospital are silently ignored (idempotent).
+    """,
+    responses={
+        201: {"content": {"application/json": {"example": {"id": 5, "name": "neurology"}}}},
+        401: {"description": "Missing or invalid token"},
+        403: {"description": "Access denied"},
+        404: {"description": "Hospital not found"},
+    },
+)
+def add_specialty(
+    hospital_id: int,
+    payload: SpecialtyCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role(UserRole.admin, UserRole.hospital_staff)),
+):
+    from app.api.v1.routes.admin import _assert_hospital_access
+    _assert_hospital_access(user, hospital_id)
+
+    hospital = db.get(Hospital, hospital_id)
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    name = payload.name.strip().lower()
+
+    # Idempotent — return existing if already present
+    existing = db.scalar(
+        select(HospitalSpecialty).where(
+            HospitalSpecialty.hospital_id == hospital_id,
+            HospitalSpecialty.name == name,
+        )
+    )
+    if existing:
+        return SpecialtyOut(id=existing.id, name=existing.name)
+
+    spec = HospitalSpecialty(hospital_id=hospital_id, name=name)
+    db.add(spec)
+    db.commit()
+    db.refresh(spec)
+    return SpecialtyOut(id=spec.id, name=spec.name)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /hospitals/{hospital_id}/specialties/{specialty_id}
+# ---------------------------------------------------------------------------
+
+@router.delete(
+    "/{hospital_id}/specialties/{specialty_id}",
+    status_code=204,
+    summary="Remove a specialty from a hospital",
+    description="""
+Remove a medical specialty from a hospital.
+
+**Requires JWT** — `admin` or `hospital_staff` (own hospital only).
+    """,
+    responses={
+        204: {"description": "Deleted successfully"},
+        401: {"description": "Missing or invalid token"},
+        403: {"description": "Access denied"},
+        404: {"description": "Hospital or specialty not found"},
+    },
+)
+def delete_specialty(
+    hospital_id: int,
+    specialty_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role(UserRole.admin, UserRole.hospital_staff)),
+):
+    from app.api.v1.routes.admin import _assert_hospital_access
+    _assert_hospital_access(user, hospital_id)
+
+    spec = db.scalar(
+        select(HospitalSpecialty).where(
+            HospitalSpecialty.id == specialty_id,
+            HospitalSpecialty.hospital_id == hospital_id,
+        )
+    )
+    if not spec:
+        raise HTTPException(status_code=404, detail="Specialty not found")
+
+    db.delete(spec)
+    db.commit()
