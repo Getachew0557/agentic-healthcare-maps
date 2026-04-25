@@ -15,5 +15,7 @@ class Citation(BaseModel):
 class TriageResponse(BaseModel):
     specialty: str
     urgency: str
+    confidence: float
+    rationale: str
     citations: list[Citation] = []
 

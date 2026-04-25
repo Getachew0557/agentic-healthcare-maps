@@ -18,7 +18,7 @@ Agentic Healthcare Maps is an AI-powered intelligence network that turns messy h
 - **AI / LLM**: Google Gemini (Gemini 1.5 Flash, free tier), Tavily (citations)
 - **OCR**: Tesseract + pytesseract + pdf2image + Pillow
 - **Backend**: FastAPI + Uvicorn, Pydantic v2, SQLAlchemy + Alembic, python-jose, passlib[bcrypt], python-dotenv, WebSockets, Redis
-- **DB**: PostgreSQL (prod) / SQLite (dev), Chroma (vector)
+- **DB**: PostgreSQL (prod) / MySQL (alt) / SQLite (dev), Redis (cache/pub-sub), Chroma (vector)
 - **Frontend**: React 18, Vite, TypeScript, Tailwind, Leaflet, React Router, Axios, TanStack Query, React Hook Form + Zod, Recharts, jwt-decode
 - **Dev tooling**: Black + Ruff, ESLint + Prettier
 - **Infra**: Docker + Compose, GitHub Actions (optional next step)
