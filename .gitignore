@@ -19,7 +19,6 @@ pip-delete-this-directory.txt
 # Data files 
 *.csv 
 *.xlsx 
-*.json 
 data/raw/ 
 # API keys 
 .env 
