@@ -20,6 +20,19 @@ async def lifespan(app: FastAPI):
     from app.services.realtime.ws_manager import redis_subscriber
     task = asyncio.create_task(redis_subscriber(settings.redis_url))
     logger.info("Redis availability subscriber started")
+
+    # Build Chroma vector index in background (non-blocking)
+    async def _build_index():
+        try:
+            import asyncio as _asyncio
+            loop = _asyncio.get_event_loop()
+            from app.services.vector.embeddings import index_all_hospitals
+            count = await loop.run_in_executor(None, index_all_hospitals)
+            logger.info("Chroma index built: %d hospitals", count)
+        except Exception as exc:
+            logger.warning("Chroma indexing failed (non-fatal): %s", exc)
+
+    asyncio.create_task(_build_index())
     yield
     task.cancel()
 
@@ -67,7 +80,8 @@ This system provides decision-support only. It does not diagnose medical conditi
             {"name": "auth", "description": "Register, login, and inspect the current user"},
             {"name": "patient", "description": "Symptom triage and hospital recommendations — public, no auth required"},
             {"name": "hospitals", "description": "Hospital directory — public read access"},
-            {"name": "admin", "description": "Hospital availability updates and audit logs — requires JWT"},
+            {"name": "doctors", "description": "Doctor CRUD and room assignments — requires JWT"},
+            {"name": "admin", "description": "Availability updates, audit logs, metrics, vector reindex — requires JWT"},
             {"name": "realtime", "description": "WebSocket channel for live availability events"},
         ],
     )

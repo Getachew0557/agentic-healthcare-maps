@@ -25,6 +25,11 @@
       "key": "specialty_id",
       "value": "1",
       "type": "string"
+    },
+    {
+      "key": "doctor_id",
+      "value": "1",
+      "type": "string"
     }
   ],
   "auth": {
@@ -503,6 +508,138 @@
       ]
     },
     {
+      "name": "Doctors",
+      "item": [
+        {
+          "name": "List Doctors at Hospital",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}/doctors",
+            "description": "Returns all active doctors with room assignments. room=null means no room assigned (AI will not invent one)."
+          }
+        },
+        {
+          "name": "Add Doctor",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}/doctors",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. Arjun Sharma\",\n  \"specialty\": \"cardiology\",\n  \"phone\": null\n}"
+            },
+            "description": "Add doctor. No room assigned initially. Dashboard shows warning: AI will not invent a room."
+          }
+        },
+        {
+          "name": "Update Doctor",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}/doctors/{{doctor_id}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. Arjun Sharma\",\n  \"is_active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Doctor (soft)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}/doctors/{{doctor_id}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Soft delete: sets is_active=False and deactivates all room assignments."
+          }
+        },
+        {
+          "name": "Assign Room to Doctor",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}/doctors/{{doctor_id}}/room",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_code\": \"Cardio-101\",\n  \"room_type\": \"consultation\"\n}"
+            },
+            "description": "Assign room. Only DB-backed rooms are shown to patients. Anti-hallucination contract enforced."
+          }
+        },
+        {
+          "name": "Remove Room Assignment",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/hospitals/{{hospital_id}}/doctors/{{doctor_id}}/room",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "After this, doctor.room=null and AI uses template: Room not on file."
+          }
+        }
+      ]
+    },
+    {
       "name": "Admin",
       "item": [
         {
@@ -624,6 +761,87 @@
               "body": "[\n  {\n    \"id\": 42,\n    \"hospital_id\": 1,\n    \"updated_by_user_id\": 1,\n    \"field_name\": \"icu_available\",\n    \"old_value\": \"5\",\n    \"new_value\": \"3\",\n    \"created_at\": \"2026-04-26T10:30:00Z\"\n  }\n]"
             }
           ]
+        },
+        {
+          "name": "Global Audit Log (admin only)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/audit?limit=50",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "hospital_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "field_name",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "All availability changes across all hospitals. Admin only. Filterable by hospital_id and field_name."
+          }
+        },
+        {
+          "name": "System Metrics (admin only)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/admin/metrics",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Hospital counts by status, user count, audit log count, vector index stats, recent changes."
+          }
+        },
+        {
+          "name": "Rebuild Vector Index (admin only)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/vector/reindex",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Re-embeds all hospitals into Chroma. Run after bulk CSV import. Takes 30-120 seconds."
+          }
         }
       ]
     },

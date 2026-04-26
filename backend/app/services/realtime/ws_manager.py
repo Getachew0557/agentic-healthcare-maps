@@ -69,16 +69,31 @@ async def redis_subscriber(redis_url: str) -> None:
     """
     Long-running coroutine: subscribes to REDIS_CHANNEL and fans out
     every message to all connected WebSocket clients.
-    Reconnects automatically on failure.
+
+    If Redis is unavailable, backs off exponentially (max 60s) and retries silently.
+    The app works fine without Redis — direct in-process broadcast handles single-worker.
     """
     import redis.asyncio as aioredis  # type: ignore[import]
 
+    backoff = 5
+    _logged_unavailable = False
+
     while True:
         try:
-            client = aioredis.from_url(redis_url, decode_responses=True)
+            client = aioredis.from_url(
+                redis_url,
+                decode_responses=True,
+                socket_connect_timeout=3,
+                socket_timeout=3,
+            )
+            await client.ping()  # fast fail if Redis is down
+            backoff = 5  # reset on successful connect
+            _logged_unavailable = False
+
             pubsub = client.pubsub()
             await pubsub.subscribe(REDIS_CHANNEL)
-            logger.info("Redis subscriber listening on channel '%s'", REDIS_CHANNEL)
+            logger.info("Redis subscriber connected on channel '%s'", REDIS_CHANNEL)
+
             async for message in pubsub.listen():
                 if message["type"] == "message":
                     try:
@@ -86,9 +101,17 @@ async def redis_subscriber(redis_url: str) -> None:
                         await manager.broadcast(payload)
                     except Exception as exc:
                         logger.warning("Failed to broadcast Redis message: %s", exc)
+
         except Exception as exc:
-            logger.warning("Redis subscriber error: %s — retrying in 5s", exc)
-            await asyncio.sleep(5)
+            if not _logged_unavailable:
+                logger.info(
+                    "Redis unavailable (%s). WebSocket broadcast will use in-process fan-out only. "
+                    "Start Redis to enable multi-worker pub/sub.",
+                    type(exc).__name__,
+                )
+                _logged_unavailable = True
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60)  # exponential backoff, max 60s
 
 
 # ---------------------------------------------------------------------------

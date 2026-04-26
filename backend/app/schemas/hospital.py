@@ -64,9 +64,23 @@ class ScoreBreakdown(BaseModel):
 class HospitalRecommendation(BaseModel):
     hospital: HospitalOut
     distance_km: float
-    eta_minutes: float | None   # None when ORS is unavailable
+    eta_minutes: float | None
     score_breakdown: ScoreBreakdown
 
 
+class RecommendationResult(BaseModel):
+    """
+    Single hospital recommendation with doctor info.
+    Anti-hallucination: doctor.room is None if no active room assignment exists.
+    claims array declares the source of every factual field.
+    """
+    hospital: HospitalOut
+    distance_km: float
+    eta_minutes: float | None
+    score_breakdown: ScoreBreakdown
+    doctors: list = []   # list[DoctorOut]
+    claims: list = []    # list[Claim] — source of hospital/doctor data
+
+
 class RecommendationResponse(BaseModel):
-    results: list[HospitalRecommendation]
+    results: list[RecommendationResult]
