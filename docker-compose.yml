@@ -1,20 +1,103 @@
 services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
 
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ahm
-      POSTGRES_PASSWORD: ahm
-      POSTGRES_DB: ahm
+      POSTGRES_USER: ${POSTGRES_USER:-ahm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ahm}
+      POSTGRES_DB: ${POSTGRES_DB:-ahm}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ahm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (FastAPI) ──────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ahm}:${POSTGRES_PASSWORD:-ahm}@postgres:5432/${POSTGRES_DB:-ahm}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_ALG: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      ORS_API_KEY: ${ORS_API_KEY:-}
+      CHROMA_PERSIST_DIR: /app/chroma_data
+      APP_ENV: ${APP_ENV:-production}
+    volumes:
+      - chroma_data:/app/chroma_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ── DB Migrations (runs once then exits) ───────────────────────────────────
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "alembic upgrade heads &&
+             python scripts/seed.py &&
+             python scripts/seed_doctors.py &&
+             python scripts/import_csv.py &&
+             python scripts/build_vector_index.py"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ahm}:${POSTGRES_PASSWORD:-ahm}@postgres:5432/${POSTGRES_DB:-ahm}
+      CHROMA_PERSIST_DIR: /app/chroma_data
+    volumes:
+      - chroma_data:/app/chroma_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Frontend (React + Nginx) ───────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
-
+  chroma_data:

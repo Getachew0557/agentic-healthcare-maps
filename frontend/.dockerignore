@@ -1,0 +1,14 @@
+# Dependencies — installed fresh in container
+node_modules/
+
+# Build output — rebuilt in container
+dist/
+
+# Secrets
+.env
+.env.local
+.env.production
+
+# Dev artifacts
+*.log
+.DS_Store

@@ -5,6 +5,10 @@ Submitted by: **Team Getachew0557**
 Repository: https://github.com/Getachew0557/agentic-healthcare-maps  
 License: **MIT**
 
+![CI](https://github.com/Getachew0557/agentic-healthcare-maps/actions/workflows/ci.yml/badge.svg)
+![Docker Build](https://github.com/Getachew0557/agentic-healthcare-maps/actions/workflows/docker-build.yml/badge.svg)
+![Lint](https://github.com/Getachew0557/agentic-healthcare-maps/actions/workflows/lint.yml/badge.svg)
+
 > No family should travel hours only to find the help they need isn't there.
 
 ---
@@ -25,38 +29,124 @@ Agentic Healthcare Maps turns messy, fragmented hospital records into a living, 
 
 ### Prerequisites
 
-- Python 3.11+ with `agentic_env` conda environment
-- PostgreSQL 14+ running locally
-- Node.js 18+
+- Docker + Docker Compose (for Option A)
+- Python 3.11+ with `agentic_env` conda environment (for Option B)
+- PostgreSQL 14+ running locally (for Option B)
+- Node.js 18+ (for Option B)
 
-### Backend
+---
 
+### Option A — Docker Compose (recommended, one command)
+
+The entire stack — PostgreSQL, Redis, Backend API, Frontend — runs in containers. Migrations and seed data load automatically on first run.
+
+**1. Clone and configure:**
+```bash
+git clone https://github.com/Getachew0557/agentic-healthcare-maps.git
+cd agentic-healthcare-maps
+cp .env.docker .env
+```
+
+**2. Edit `.env` and add your API keys:**
+```env
+GEMINI_API_KEY=your_key_from_aistudio.google.com
+TAVILY_API_KEY=your_key_from_tavily.com
+ORS_API_KEY=your_key_from_openrouteservice.org
+JWT_SECRET=change_me_to_a_long_random_string
+```
+
+**3. Start everything:**
+```bash
+docker compose up -d
+```
+
+**4. Watch the first-run setup (migrations + seed + vector index):**
+```bash
+docker compose logs -f migrate
+# Wait for: "Chroma index built: 284 hospitals"
+```
+
+**5. Open:**
+```
+Frontend:  http://localhost
+API docs:  http://localhost:8000/docs
+ReDoc:     http://localhost:8000/redoc
+```
+
+**Useful Docker commands:**
+```bash
+# View all service logs
+docker compose logs -f
+
+# Restart just the backend
+docker compose restart backend
+
+# Stop everything
+docker compose down
+
+# Stop and remove volumes (full reset)
+docker compose down -v
+
+# Rebuild after code changes
+docker compose up -d --build backend
+```
+
+**Services and ports:**
+
+| Service | Port | Description |
+|---|---|---|
+| Frontend (Nginx) | `80` | React app |
+| Backend (FastAPI) | `8000` | REST API + WebSocket |
+| PostgreSQL | `5432` | Database |
+| Redis | `6379` | Pub/sub cache |
+
+---
+
+### Option B — Local Development (manual)
+
+**Backend:**
 ```bash
 conda activate agentic_env
 cd backend
 cp .env.example .env          # add your API keys
 alembic upgrade heads          # create DB tables
-python scripts/seed.py         # seed 53 hospitals
+python scripts/seed.py         # seed 53 Mumbai/Pune hospitals
 python scripts/import_csv.py   # load 284 real hospitals from CSV
-python scripts/seed_doctors.py # seed demo doctors
-python scripts/build_vector_index.py  # build Chroma RAG index
+python scripts/seed_doctors.py # seed 50 demo doctors with room assignments
+python scripts/build_vector_index.py  # build Chroma RAG index (~45s)
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend
-
+**Frontend:**
 ```bash
 cd frontend
 npm install
 cp .env.example .env
 npm run dev
+# Opens at http://localhost:5173
 ```
+
+---
 
 ### API Documentation
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 - Postman: import `docs/postman_collection.json`
+
+---
+
+## CI/CD (GitHub Actions)
+
+Three workflows run automatically on every push:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | Push/PR to `main`, `backend`, `develop` | Runs 67 backend unit tests against a real PostgreSQL service |
+| `docker-build.yml` | Push to `main` | Builds both Docker images to verify they compile |
+| `lint.yml` | Every push/PR | Ruff + Black (Python), ESLint (TypeScript) |
+
+Badges at the top of this README show live status.
 
 ---
 
