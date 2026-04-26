@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
+import os
+import sys
+
+# Add the parent directory of alembic (backend) to sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 from alembic import context
 from app.core.config import settings
 from app.db import models  # noqa: F401
