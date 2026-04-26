@@ -14,8 +14,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import httpx
+import os
 
-BASE = "http://localhost:8000/api/v1"
+BASE = os.environ.get("API_BASE_URL", "http://localhost:8000/api/v1")
 
 TESTS = [
     {

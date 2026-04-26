@@ -14,7 +14,8 @@ from app.models.specialty import HospitalSpecialty
 from app.models.user import User, UserRole
 from app.core.security import create_access_token, hash_password
 
-TEST_DB_URL = "postgresql+psycopg2://postgres:root@localhost:5432/ahm_test"
+from app.core.config import settings as _settings
+TEST_DB_URL = _settings.test_database_url
 
 _engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
 _TestSession = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
@@ -329,3 +330,4 @@ async def test_delete_specialty_not_found(hospital, admin_user):
             headers={"Authorization": f"Bearer {_tok(admin_user)}"},
         )
     assert res.status_code == 404
+

@@ -183,7 +183,7 @@ Patient Browser          Hospital Dashboard        Admin Panel
 
 | Layer | Technology | Cost |
 |---|---|---|
-| AI Triage | Google Gemini 1.5 Flash | Free (60 req/min) |
+| AI Triage | Google Gemini 3 Flash Preview | Free (60 req/min) |
 | Medical Search | Tavily API | Free (hackathon credits) |
 | Vector Search | Chroma + all-MiniLM-L6-v2 | Open source |
 | OCR | Tesseract + pytesseract | Open source |
@@ -240,39 +240,70 @@ Upload PDFs, images of handwritten registers, CSVs, JSON, or Excel files. Tesser
 
 ```
 agentic-healthcare-maps/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml             # backend tests on every push
+│       ├── docker-build.yml   # Docker image build verification
+│       └── lint.yml           # Ruff + Black + ESLint
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/routes/     # 11 route files
+│   │   ├── api/v1/routes/     # 11 route files, 39 endpoints
 │   │   ├── core/              # config, auth, security
 │   │   ├── db/                # base, session, models
 │   │   ├── models/            # 7 SQLAlchemy models
 │   │   ├── schemas/           # Pydantic schemas
 │   │   ├── services/          # gemini, tavily, ranking, vector, ocr, realtime
-│   │   └── tests/             # 67 tests
+│   │   └── tests/             # 67 tests (unit + live)
 │   ├── alembic/               # 3 migrations
 │   ├── data/                  # healthcare_living_map_FINAL.csv (284 hospitals)
-│   └── scripts/               # seed, import, build_index
+│   ├── scripts/               # seed, import, build_index
+│   ├── Dockerfile             # multi-stage Python 3.11 + Tesseract
+│   └── .dockerignore
 ├── frontend/
-│   └── src/
-│       ├── api/               # axios clients
-│       ├── pages/             # patient, admin
-│       └── routes/            # React Router
+│   ├── src/
+│   │   ├── api/               # axios clients
+│   │   ├── pages/             # patient, admin
+│   │   └── routes/            # React Router
+│   ├── Dockerfile             # multi-stage Node 20 + Nginx
+│   ├── nginx.conf             # SPA routing + gzip + security headers
+│   └── .dockerignore
 ├── docs/
-│   ├── API_CONTRACT.md
-│   ├── ARCHITECTURE.md
-│   └── postman_collection.json
-└── docker-compose.yml         # PostgreSQL + Redis
+│   ├── API_CONTRACT.md        # full 39-endpoint contract
+│   ├── ARCHITECTURE.md        # system diagrams + data flows
+│   └── postman_collection.json # 49 requests, auto-saves JWT
+├── docker-compose.yml         # full stack: Postgres + Redis + Backend + Frontend
+├── .env.docker                # Docker Compose env template
+└── README.md
 ```
 
 ---
 
 ## Running Tests
 
+**Unit tests** (no server needed):
 ```bash
 conda activate agentic_env
 cd backend
-python -m pytest app/tests/ -v
+python -m pytest app/tests/ \
+  --ignore=app/tests/test_chat_live.py \
+  --ignore=app/tests/test_gemini_live.py \
+  -v
 # 67 passed
+```
+
+**Live end-to-end chat test** (server must be running):
+```bash
+# Start server first
+uvicorn app.main:app --port 8000
+
+# In another terminal
+python app/tests/test_chat_live.py
+# 5 passed — English, Hindi, fever, stroke, pediatric scenarios
+```
+
+**Live Gemini API test:**
+```bash
+python app/tests/test_gemini_live.py
 ```
 
 ---

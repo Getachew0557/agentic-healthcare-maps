@@ -19,7 +19,8 @@ from app.core.security import create_access_token, hash_password
 # Test DB  dedicated Postgres test database
 # ---------------------------------------------------------------------------
 
-TEST_DB_URL = "postgresql+psycopg2://postgres:root@localhost:5432/ahm_test"
+from app.core.config import settings as _settings
+TEST_DB_URL = _settings.test_database_url
 
 # Create test DB if it does not exist (run once at import time)
 def _ensure_test_db() -> None:
@@ -251,3 +252,4 @@ async def test_availability_logs_returned(hospital, staff_user, db):
     logs = res.json()
     assert len(logs) >= 1
     assert logs[0]["field_name"] == "icu_available"
+
