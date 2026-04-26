@@ -67,18 +67,20 @@ def _build_hospital_document(
     ventilators_available: int,
     is_24x7: bool,
     phone: str | None,
+    website: str | None = None,
 ) -> str:
     spec_str = ", ".join(s.replace("_", " ").title() for s in specialties) or "General Medicine"
     beds = icu_available + general_available
     vent_str = f"Ventilators available: {ventilators_available}." if ventilators_available else ""
     hours = "Open 24 hours, 7 days a week." if is_24x7 else "Not 24x7."
-    contact = f"Contact: {phone}." if phone else ""
+    contact = f"Phone: {phone}." if phone else ""
+    web = f"Official website: {website}." if website else ""
     return (
         f"{name} is a hospital located at {address}. "
         f"Medical specialties: {spec_str}. "
         f"Status: {status}. "
         f"Available beds: {beds} (ICU: {icu_available}, General: {general_available}). "
-        f"{vent_str} {hours} {contact}"
+        f"{vent_str} {hours} {web} {contact}"
     ).strip()
 
 
@@ -94,6 +96,7 @@ def index_hospital(
     ventilators_available: int,
     is_24x7: bool,
     phone: str | None,
+    website: str | None = None,
     city: str = "",
     country: str = "",
 ) -> None:
@@ -112,6 +115,7 @@ def index_hospital(
             ventilators_available=ventilators_available,
             is_24x7=is_24x7,
             phone=phone,
+            website=website,
         )
 
         embedding = model.encode(doc).tolist()
@@ -168,6 +172,7 @@ def index_all_hospitals() -> int:
                 ventilators_available=h.ventilators_available,
                 is_24x7=h.is_24x7,
                 phone=h.phone,
+                website=h.website,
                 city=city,
                 country=country,
             )

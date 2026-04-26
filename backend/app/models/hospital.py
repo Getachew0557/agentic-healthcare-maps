@@ -18,9 +18,11 @@ class Hospital(Base):
     __tablename__ = "hospitals"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    external_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
     name: Mapped[str] = mapped_column(String(255), index=True)
     address: Mapped[str] = mapped_column(Text, default="")
     phone: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     lat: Mapped[float] = mapped_column(Float)
     lng: Mapped[float] = mapped_column(Float)

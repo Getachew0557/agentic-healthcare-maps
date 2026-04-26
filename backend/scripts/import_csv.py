@@ -18,9 +18,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from app.db.session import SessionLocal
+from app.models.doctor import Doctor, DoctorRoomAssignment
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.specialty import HospitalSpecialty
 
@@ -113,9 +114,12 @@ def import_csv(csv_path: str, clear: bool = False) -> None:
     db = SessionLocal()
     try:
         if clear:
-            # Remove hospitals that came from CSV (identified by external_id prefix HOSP-)
-            # We store external_id in the address field as a comment — simpler: just truncate all
-            print("Clearing all existing hospitals...")
+            print("Clearing doctors, room assignments, specialties, hospitals...")
+            names = set(inspect(db.get_bind()).get_table_names())
+            if "doctor_room_assignments" in names:
+                db.query(DoctorRoomAssignment).delete()
+            if "doctors" in names:
+                db.query(Doctor).delete()
             db.query(HospitalSpecialty).delete()
             db.query(Hospital).delete()
             db.commit()
@@ -137,6 +141,12 @@ def import_csv(csv_path: str, clear: bool = False) -> None:
                 errors += 1
                 continue
 
+            ext = (row.get("hospital_id") or "").strip() or None
+            if ext:
+                ex = db.scalar(select(Hospital).where(Hospital.external_id == ext))
+                if ex:
+                    skipped += 1
+                    continue
             # Idempotency — skip if name already exists
             existing = db.scalar(select(Hospital).where(Hospital.name == name))
             if existing:
@@ -156,9 +166,11 @@ def import_csv(csv_path: str, clear: bool = False) -> None:
             website = (row.get("hospital_website_url") or "").strip() or None
 
             hospital = Hospital(
+                external_id=ext,
                 name=name,
                 address=address,
-                phone=website,   # store website as phone field for now (frontend shows it)
+                phone=None,
+                website=website,
                 lat=lat,
                 lng=lng,
                 is_24x7=True,

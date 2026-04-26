@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { jwtDecode } from "jwt-decode";
 import {
+  AUTH_CHANGED_EVENT,
   clearToken,
   getToken,
-  mintMockJwt,
-  setToken,
   type AuthPayload,
 } from "@/lib/authStorage";
 import type { UserRole } from "@/shared/types";
@@ -16,21 +15,29 @@ export interface AuthUser {
   hospitalId?: string;
 }
 
+function mapJwtRoleToUserRole(r?: string): UserRole {
+  if (r === "admin") return "admin";
+  if (r === "hospital_staff") return "staff";
+  return "patient";
+}
+
 function decode(token: string | null): AuthUser | null {
   if (!token) return null;
   try {
     const p = jwtDecode<AuthPayload>(token);
     if (p.exp * 1000 < Date.now()) return null;
-    return { id: p.sub, email: p.email, role: p.role, hospitalId: p.hospitalId };
+    return {
+      id: p.sub,
+      email: p.email ?? "",
+      role: mapJwtRoleToUserRole(p.role),
+      hospitalId: p.hospital_id != null ? String(p.hospital_id) : undefined,
+    };
   } catch {
     return null;
   }
 }
 
-/**
- * Auth hook. Mock JWT is minted client-side for the demo; swap `mockLogin`
- * for an axios POST to `/auth/login` once the backend is real.
- */
+/** Auth hook: user is derived from JWT (`/auth/login` tokens include email, role, hospital_id). */
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(() => decode(getToken()));
 
@@ -62,19 +69,15 @@ export function useAuth() {
     function onStorage(e: StorageEvent) {
       if (e.key === "ahm.auth.token") setUser(decode(getToken()));
     }
+    function onAuthChanged() {
+      setUser(decode(getToken()));
+    }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const mockLogin = useCallback((email: string, role: UserRole) => {
-    const token = mintMockJwt({
-      sub: `u-${role}-${Date.now()}`,
-      email,
-      role,
-      hospitalId: role === "staff" ? "h-kem" : undefined,
-    });
-    setToken(token);
-    setUser(decode(token));
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    };
   }, []);
 
   const logout = useCallback(() => {
@@ -89,7 +92,6 @@ export function useAuth() {
     user,
     isAuthenticated: !!user,
     role: user?.role ?? null,
-    mockLogin,
     logout,
   };
 }

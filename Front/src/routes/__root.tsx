@@ -29,7 +29,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Agentic Healthcare Maps — Find the right hospital, fast" },
+      { title: "ChatMap — Find the right hospital, fast" },
       { name: "description", content: "AI-powered hospital routing using symptoms, specialty, bed availability, and travel time. Built for India." },
     ],
     links: [{ rel: "stylesheet", href: appCss }],

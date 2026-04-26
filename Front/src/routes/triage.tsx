@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { Send, MapPin, Loader2, AlertTriangle, Phone, Clock, BedDouble, ChevronDown, Plus, MessageSquare } from "lucide-react";
+import { 
+  Send, MapPin, Loader2, AlertTriangle, Phone, Clock, BedDouble, ChevronDown, 
+  Plus, MessageSquare, Menu, X, Bot, User, Calendar, CheckCircle, 
+  Navigation, Hospital, Star, TrendingUp, Shield, HeartPulse, 
+  Mic, Paperclip, MoreVertical, Copy, Share2, ThumbsUp, ThumbsDown, ArrowRight
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { analyzeSymptoms } from "@/shared/services/hospitalService";
+import { analyzeSymptoms, DEFAULT_MAP_ORIGIN } from "@/shared/services/hospitalService";
 import type { RankedHospital, TriageResult } from "@/shared/types";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Location = {
   lat: number;
@@ -22,6 +31,8 @@ type DoctorCard = {
   name: string;
   specialty: string;
   room?: string | null;
+  image?: string;
+  available?: boolean;
 };
 
 type HospitalCard = {
@@ -42,6 +53,9 @@ type HospitalCard = {
     doctors: DoctorCard[];
   };
   specialtyContext: string;
+  rating?: number;
+  reviews?: number;
+  image?: string;
 };
 
 type AssistantMessage = {
@@ -61,6 +75,7 @@ interface ChatTurn {
   role: "user" | "assistant" | "stage";
   content: string;
   data?: AssistantMessage;
+  timestamp?: number;
 }
 
 type ChatSession = {
@@ -71,18 +86,19 @@ type ChatSession = {
 };
 
 const STAGES = [
-  "Understanding symptoms...",
-  "Finding nearby hospitals...",
-  "Checking doctors and rooms on file...",
+  "Analyzing symptoms...",
+  "Scanning nearby facilities...",
+  "Verifying doctor availability...",
+  "Calculating optimal routes...",
 ];
 
-const CHAT_STORAGE_KEY = "triage.chat.sessions.v1";
-const ACTIVE_CHAT_STORAGE_KEY = "triage.chat.active.v1";
+const CHAT_STORAGE_KEY = "triage.chat.sessions.v2";
+const ACTIVE_CHAT_STORAGE_KEY = "triage.chat.active.v2";
 
 export const Route = createFileRoute("/triage")({
   head: () => ({
     meta: [
-      { title: "Symptom Search — Agentic Healthcare Maps" },
+      { title: "AI Symptom Triage — ChatMap" },
       {
         name: "description",
         content: "Chat-first triage flow with nearby hospital recommendations and verified details.",
@@ -99,10 +115,11 @@ function TriagePage() {
     const stored = window.localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY);
     return stored ?? "bootstrap";
   });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!sessions.length) {
-      const fresh = createSession("New chat");
+      const fresh = createSession("New conversation");
       setSessions([fresh]);
       setActiveSessionId(fresh.id);
       return;
@@ -125,9 +142,10 @@ function TriagePage() {
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
 
   const createNewChat = () => {
-    const next = createSession("New chat");
+    const next = createSession("New conversation");
     setSessions((prev) => [next, ...prev]);
     setActiveSessionId(next.id);
+    setSidebarOpen(false);
   };
 
   const handleSessionUpdate = useCallback(
@@ -151,60 +169,132 @@ function TriagePage() {
   );
 
   return (
-    <div className="h-[calc(100vh-4rem)] w-full">
-      <div className="grid h-full w-full md:grid-cols-[280px_1fr]">
-        <aside className="hidden h-full bg-muted/40 md:flex md:flex-col">
-          <div className="p-3">
-            <Button onClick={createNewChat} className="w-full justify-start gap-2">
-              <Plus className="h-4 w-4" />
-              New chat
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
-            {sessions.map((session) => {
-              const active = session.id === activeSessionId;
-              return (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => setActiveSessionId(session.id)}
-                  className={
-                    "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors " +
-                    (active
-                      ? "bg-background text-foreground"
-                      : "text-muted-foreground hover:bg-background/80 hover:text-foreground")
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 flex-none" />
-                    <span className="truncate">{session.title}</span>
-                  </div>
-                </button>
-              );
-            })}
+    <div className="h-[calc(100vh-4rem)] w-full bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
+      <div className="relative flex h-full w-full">
+        {/* Mobile Sidebar Toggle */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute left-4 top-4 z-20 rounded-lg bg-white p-2 shadow-md md:hidden"
+        >
+          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+
+        {/* Sidebar */}
+        <aside
+          className={`
+            absolute inset-y-0 left-0 z-10 w-80 transform bg-white shadow-xl transition-transform duration-300 md:relative md:translate-x-0
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          `}
+        >
+          <div className="flex h-full flex-col">
+            <div className="border-b border-gray-100 bg-gradient-to-r from-primary/5 to-primary/10 p-4">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-primary/10 p-2">
+                  <HeartPulse className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-heading font-semibold text-gray-900">Conversations</h2>
+                  <p className="text-xs text-gray-500">Your triage history</p>
+                </div>
+              </div>
+              <Button 
+                onClick={createNewChat} 
+                className="mt-4 w-full gap-2 bg-gradient-to-r from-primary to-primary/90 shadow-md"
+              >
+                <Plus className="h-4 w-4" />
+                New conversation
+              </Button>
+            </div>
+            
+            <ScrollArea className="flex-1 px-2 py-4">
+              <div className="space-y-1">
+                {sessions.map((session) => {
+                  const active = session.id === activeSessionId;
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveSessionId(session.id);
+                        setSidebarOpen(false);
+                      }}
+                      className={`
+                        w-full rounded-lg px-3 py-3 text-left transition-all duration-200
+                        ${active
+                          ? "bg-gradient-to-r from-primary/10 to-primary/5 text-foreground shadow-sm"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`
+                          rounded-lg p-1.5 transition-all
+                          ${active ? "bg-primary/20" : "bg-gray-100"}
+                        `}>
+                          <MessageSquare className={`h-4 w-4 ${active ? "text-primary" : "text-gray-500"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-sm font-medium">{session.title}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(session.updatedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            <div className="border-t border-gray-100 p-4">
+              <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <p className="text-xs font-medium text-gray-700">AI-powered triage</p>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Not for emergencies • Always verify with hospitals</p>
+              </div>
+            </div>
           </div>
         </aside>
 
-        <section className="flex h-full min-h-0 flex-col">
-          <div className="flex items-center justify-between px-3 py-2 md:hidden">
-            <h1 className="font-heading text-lg font-semibold">AI Symptom Triage</h1>
-            <Button onClick={createNewChat} size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              New chat
-            </Button>
-          </div>
-          <div className="hidden px-6 py-4 md:block">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight">AI Symptom Triage</h1>
-            <p className="text-sm text-muted-foreground">
-              Describe symptoms and location. This is decision support only and does not diagnose.
-            </p>
-          </div>
+        {/* Main Chat Area */}
+        <main className="flex-1 flex flex-col min-h-0">
           <ChatPanel
             key={activeSession.id}
             initialTurns={activeSession.turns}
             onTurnsChange={handleSessionUpdate}
           />
-        </section>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// Welcome message component
+function WelcomeMessage() {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className="mb-4 rounded-full bg-gradient-to-r from-primary/20 to-primary/10 p-4">
+        <Bot className="h-12 w-12 text-primary" />
+      </div>
+      <h3 className="text-2xl font-bold text-gray-900">How can I help you today?</h3>
+      <p className="mt-2 max-w-md text-gray-500">
+        Describe your symptoms and location, and I'll help find the right care for you.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        {[
+          "Chest pain and difficulty breathing",
+          "Fever with severe headache",
+          "Broken arm after a fall",
+          "Severe abdominal pain",
+        ].map((suggestion) => (
+          <button
+            key={suggestion}
+            className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition-all hover:border-primary/50 hover:bg-primary/5 hover:shadow-sm"
+          >
+            {suggestion}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -224,6 +314,7 @@ function ChatPanel({
   const [isLocating, setIsLocating] = useState(false);
   const [stageIdx, setStageIdx] = useState(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const mutation = useMutation({
     mutationFn: postChat,
@@ -236,6 +327,7 @@ function ChatPanel({
           role: "assistant",
           content: res.assistant.text,
           data: res.assistant,
+          timestamp: Date.now(),
         },
       ]);
     },
@@ -243,22 +335,29 @@ function ChatPanel({
       setStageIdx(-1);
       setTurns((t) => [
         ...t.filter((x) => x.role !== "stage"),
-        { id: `err-${Date.now()}`, role: "assistant", content: "Something went wrong. Please try again." },
+        { 
+          id: `err-${Date.now()}`, 
+          role: "assistant", 
+          content: "I'm having trouble processing your request. Please try again.",
+          timestamp: Date.now(),
+        },
       ]);
-      toast.error("Chat request failed");
+      toast.error("Unable to process your request. Please try again.");
     },
   });
 
   useEffect(() => {
     if (mutation.isPending) {
       setStageIdx(0);
-      const timers = STAGES.map((_, i) => window.setTimeout(() => setStageIdx(i), i * 350));
+      const timers = STAGES.map((_, i) => window.setTimeout(() => setStageIdx(i), i * 400));
       return () => timers.forEach((t) => window.clearTimeout(t));
     }
   }, [mutation.isPending]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   }, [turns, stageIdx]);
 
   useEffect(() => {
@@ -268,62 +367,29 @@ function ChatPanel({
   const useGeo = () => {
     if (isLocating) return;
     if (!("geolocation" in navigator)) {
-      toast.error("Geolocation not supported on this device");
-      return;
-    }
-    if (typeof window !== "undefined" && !window.isSecureContext) {
-      toast.error("Location needs HTTPS or localhost. Use city input instead.");
+      toast.error("Geolocation is not supported on this device");
       return;
     }
     setIsLocating(true);
 
-    const onSuccess = (pos: GeolocationPosition) => {
-      const loc: Location = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        label: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
-      };
-      setLocation(loc);
-      setCity(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
-      setIsLocating(false);
-      toast.success("Location captured");
-    };
-
-    const onError = (err: GeolocationPositionError) => {
-      setIsLocating(false);
-      if (err.code === err.PERMISSION_DENIED) {
-        toast.error("Location permission denied. Allow access in browser settings.");
-        return;
-      }
-      if (err.code === err.TIMEOUT) {
-        toast.error("Location request timed out. Try again or enter city manually.");
-        return;
-      }
-      toast.error(`Location error: ${err.message}`);
-    };
-
-    const requestLocation = () =>
-      navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 120000,
-      });
-
-    if ("permissions" in navigator && navigator.permissions?.query) {
-      navigator.permissions
-        .query({ name: "geolocation" })
-        .then((result) => {
-          if (result.state === "denied") {
-            setIsLocating(false);
-            toast.error("Location blocked by browser. Enable it in site settings.");
-            return;
-          }
-          requestLocation();
-        })
-        .catch(() => requestLocation());
-      return;
-    }
-    requestLocation();
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc: Location = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          label: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
+        };
+        setLocation(loc);
+        setCity(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+        setIsLocating(false);
+        toast.success("Location detected successfully");
+      },
+      () => {
+        setIsLocating(false);
+        toast.error("Unable to get your location. Please enter city manually.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const submit = (e: React.FormEvent) => {
@@ -333,104 +399,221 @@ function ChatPanel({
     let loc = location;
     if (!loc && city.trim()) {
       const c = city.trim().toLowerCase();
-      loc = c.includes("pune")
-        ? { lat: 18.52, lng: 73.85, label: city }
-        : { lat: 19.05, lng: 72.83, label: city };
+      if (c.includes("pune")) {
+        loc = { lat: 18.52, lng: 73.85, label: city };
+      } else if (c.includes("mumbai")) {
+        loc = { lat: 19.05, lng: 72.83, label: city };
+      } else if (c.includes("casablanca") || c === "casa" || c.includes("الدار")) {
+        loc = { lat: 33.5883, lng: -7.6114, label: city };
+      } else if (c.includes("rabat")) {
+        loc = { lat: 34.0209, lng: -6.8416, label: city };
+      } else if (c.includes("marrakech") || c.includes("marrakesh")) {
+        loc = { lat: 31.6295, lng: -7.9811, label: city };
+      } else if (c.includes("fes") || c.includes("fès") || c.includes("fez")) {
+        loc = { lat: 34.0181, lng: -5.0078, label: city };
+      } else {
+        loc = { lat: DEFAULT_MAP_ORIGIN.lat, lng: DEFAULT_MAP_ORIGIN.lng, label: city };
+      }
       setLocation(loc);
     }
-    setTurns((t) => [...t, { id: `u-${Date.now()}`, role: "user", content: message }]);
+    setTurns((t) => [...t, { 
+      id: `u-${Date.now()}`, 
+      role: "user", 
+      content: message,
+      timestamp: Date.now(),
+    }]);
     setInput("");
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
     mutation.mutate({ message, location: loc });
   };
 
+  const hasMessages = turns.length > 1 || (turns.length === 1 && turns[0].role !== "assistant");
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-6 md:px-10">
-        {turns.map((t) => (
-          <div key={t.id} className={t.role === "user" ? "flex justify-end" : ""}>
-            {t.role === "user" ? (
-              <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-                {t.content}
-              </div>
-            ) : (
-              <div className="w-full max-w-[min(100%,52rem)] space-y-3">
-                {t.data?.lowConfidence && (
-                  <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/15 p-3 text-sm text-warning-foreground">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
-                    <span>Low-confidence answer. Please call the hospital to confirm details.</span>
+    <>
+      {/* Chat Header */}
+      <div className="border-b border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-3 md:px-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="hidden md:block">
+              <h1 className="font-heading text-xl font-semibold text-gray-900">AI Symptom Triage</h1>
+              <p className="text-xs text-gray-500">Powered by Agentic AI • Real-time hospital matching</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="gap-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              Live
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <ScrollArea className="flex-1 px-4 py-6 md:px-8" ref={scrollRef}>
+        {!hasMessages ? (
+          <WelcomeMessage />
+        ) : (
+          <div className="mx-auto max-w-4xl space-y-6">
+            {turns.map((t) => (
+              <div key={t.id} className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}>
+                {t.role === "user" ? (
+                  <div className="group flex max-w-[85%] gap-3">
+                    <div className="flex-1">
+                      <div className="rounded-2xl rounded-br-md bg-gradient-to-r from-primary to-primary/90 px-4 py-3 text-white shadow-md">
+                        <p className="text-sm leading-relaxed">{t.content}</p>
+                      </div>
+                      {t.timestamp && (
+                        <p className="mt-1 text-right text-xs text-gray-400">
+                          {new Date(t.timestamp).toLocaleTimeString()}
+                        </p>
+                      )}
+                    </div>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-primary/10 text-primary">U</AvatarFallback>
+                    </Avatar>
+                  </div>
+                ) : (
+                  <div className="group flex max-w-[85%] gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-gradient-to-r from-primary/20 to-primary/10 text-primary">
+                        <Bot className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-3">
+                      {t.data?.lowConfidence && (
+                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+                          <div>
+                            <p className="text-sm font-medium">Limited data available</p>
+                            <p className="text-xs">Please call the hospital to verify bed availability and doctor schedules.</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="rounded-2xl rounded-bl-md bg-gray-100 px-4 py-3">
+                        <p className="text-sm leading-relaxed text-gray-800">{t.content}</p>
+                      </div>
+                      {t.data?.cards.map((c) => (
+                        <HospitalCardView key={c.hospitalId} card={c} />
+                      ))}
+                      {t.timestamp && (
+                        <p className="text-xs text-gray-400">{new Date(t.timestamp).toLocaleTimeString()}</p>
+                      )}
+                    </div>
                   </div>
                 )}
-                <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm text-foreground">
-                  {t.content}
+              </div>
+            ))}
+            
+            {mutation.isPending && stageIdx >= 0 && (
+              <div className="flex justify-start">
+                <div className="flex gap-3 max-w-[85%]">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-gradient-to-r from-primary/20 to-primary/10">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="rounded-2xl rounded-bl-md bg-gray-100 px-4 py-3">
+                    <div className="space-y-2">
+                      {STAGES.map((s, i) => (
+                        <div key={s} className="flex items-center gap-2">
+                          {i < stageIdx ? (
+                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                          ) : i === stageIdx ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          ) : (
+                            <div className="h-3 w-3 rounded-full border border-gray-300" />
+                          )}
+                          <span className={`text-xs ${i <= stageIdx ? "text-gray-700" : "text-gray-400"}`}>
+                            {s}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                {t.data?.cards.map((c) => (
-                  <HospitalCardView key={c.hospitalId} card={c} />
-                ))}
               </div>
             )}
           </div>
-        ))}
-        {mutation.isPending && stageIdx >= 0 && (
-          <div className="space-y-1.5 rounded-2xl rounded-bl-sm bg-muted px-4 py-3 text-sm">
-            {STAGES.map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                {i < stageIdx ? (
-                  <span className="h-3 w-3 rounded-full bg-success" />
-                ) : i === stageIdx ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                ) : (
-                  <span className="h-3 w-3 rounded-full border border-border" />
-                )}
-                <span className={i <= stageIdx ? "text-foreground" : "text-muted-foreground"}>{s}</span>
-              </div>
-            ))}
-          </div>
         )}
-      </div>
+      </ScrollArea>
 
-      <form onSubmit={submit} className="bg-background px-3 pb-4 pt-2 sm:px-6 md:px-10 md:pb-6">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={useGeo} className="gap-1.5" disabled={isLocating}>
-            {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-            {isLocating ? "Getting location..." : "Use my location"}
-          </Button>
-          <Input
-            placeholder="or enter city / postal"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className="h-9 max-w-[220px]"
-          />
-          {location?.label && <span className="text-xs text-muted-foreground">📍 {location.label}</span>}
-        </div>
-        <div className="flex items-end gap-2 rounded-2xl bg-muted/60 p-2">
-          <Textarea
-            placeholder="Describe symptoms (e.g., chest pain since this morning, age 58)..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit(e);
-              }
-            }}
-            rows={2}
-            className="min-h-[60px] resize-none text-base"
-          />
-          <Button type="submit" disabled={!input.trim() || mutation.isPending} size="lg" className="h-[60px] gap-2 rounded-xl">
-            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Send
-          </Button>
-        </div>
-      </form>
-    </div>
+      {/* Input Area */}
+      <div className="border-t border-gray-200 bg-white/80 backdrop-blur-sm p-4 md:p-6">
+        <form onSubmit={submit} className="mx-auto max-w-4xl">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" onClick={useGeo} disabled={isLocating} className="gap-1.5">
+                    {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                    {isLocating ? "Detecting..." : "Location"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Use your current location</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <Input
+              placeholder="Or enter city (e.g. Casablanca, Rabat, Mumbai)"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="h-9 max-w-[200px]"
+            />
+            
+            {location?.label && (
+              <Badge variant="secondary" className="gap-1">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                Location set
+              </Badge>
+            )}
+          </div>
+          
+          <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
+            <Textarea
+              ref={inputRef}
+              placeholder="Describe your symptoms... (e.g., 'Chest pain and shortness of breath for 30 minutes')"
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit(e);
+                }
+              }}
+              rows={1}
+              className="min-h-[44px] max-h-32 resize-none border-0 p-3 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+            <Button 
+              type="submit" 
+              disabled={!input.trim() || mutation.isPending} 
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-r from-primary to-primary/90 shadow-md"
+            >
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+          
+          <p className="mt-2 text-center text-xs text-gray-400">
+            AI-powered recommendations • Always verify with hospitals before visiting
+          </p>
+        </form>
+      </div>
+    </>
   );
 }
 
 const DEFAULT_WELCOME_TURN: ChatTurn = {
   id: "welcome",
   role: "assistant",
-  content:
-    "Hi — describe your symptoms and (optionally) your location. I'll route you to nearby appropriate hospitals with current bed availability and best match details. I do not diagnose.",
+  content: "Hello! I'm your AI healthcare assistant. Describe your symptoms and location, and I'll help find the most suitable hospitals near you with real-time availability.",
+  timestamp: Date.now(),
 };
 
 function createSession(title: string): ChatSession {
@@ -444,130 +627,155 @@ function createSession(title: string): ChatSession {
 
 function inferTitle(turns: ChatTurn[]): string {
   const firstUser = turns.find((t) => t.role === "user");
-  if (!firstUser) return "New chat";
-  return firstUser.content.length > 36
-    ? `${firstUser.content.slice(0, 36)}...`
+  if (!firstUser) return "New conversation";
+  return firstUser.content.length > 40
+    ? `${firstUser.content.slice(0, 40)}...`
     : firstUser.content;
 }
 
 function loadStoredSessions(): ChatSession[] {
-  if (typeof window === "undefined") return [createSession("New chat")];
+  if (typeof window === "undefined") return [createSession("New conversation")];
   const raw = window.localStorage.getItem(CHAT_STORAGE_KEY);
-  if (!raw) return [createSession("New chat")];
+  if (!raw) return [createSession("New conversation")];
   try {
     const parsed = JSON.parse(raw) as ChatSession[];
-    if (!Array.isArray(parsed) || parsed.length === 0) return [createSession("New chat")];
-    const valid = parsed.filter((s) => s?.id && Array.isArray(s.turns));
-    return valid.length > 0 ? valid : [createSession("New chat")];
+    if (!Array.isArray(parsed) || parsed.length === 0) return [createSession("New conversation")];
+    return parsed.filter((s) => s?.id && Array.isArray(s.turns));
   } catch {
-    return [createSession("New chat")];
+    return [createSession("New conversation")];
   }
 }
 
-const loadLabel: Record<HospitalCard["loadLevel"], { label: string; cls: string }> = {
-  low: { label: "Beds available", cls: "bg-success/15 text-success" },
-  medium: { label: "Limited beds", cls: "bg-warning/20 text-warning-foreground" },
-  high: { label: "Near capacity", cls: "bg-destructive/15 text-destructive" },
+const loadLabel: Record<HospitalCard["loadLevel"], { label: string; cls: string; icon: any }> = {
+  low: { label: "Available", cls: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle },
+  medium: { label: "Limited", cls: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: Clock },
+  high: { label: "Near Capacity", cls: "bg-red-50 text-red-700 border-red-200", icon: AlertTriangle },
 };
 
 function HospitalCardView({ card }: { card: HospitalCard }) {
   const load = loadLabel[card.loadLevel];
+  const LoadIcon = load.icon;
+  
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold leading-tight text-card-foreground">{card.name}</h3>
-          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3" /> {card.address}
-          </p>
+    <div className="group rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md hover:border-primary/30">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Hospital className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold text-gray-900">{card.name}</h3>
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+              <MapPin className="h-3 w-3" />
+              {card.address}
+            </div>
+          </div>
+          <Badge className={`${load.cls} border px-2 py-1 font-medium gap-1`}>
+            <LoadIcon className="h-3 w-3" />
+            {load.label}
+          </Badge>
         </div>
-        <Badge className={`${load.cls} border-0 font-medium`}>{load.label}</Badge>
-      </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-        <span className="inline-flex items-center gap-1 text-foreground">
-          <Clock className="h-4 w-4 text-primary" /> {card.etaMinutes} min · {card.distanceKm} km
-        </span>
-        <a href={`tel:${card.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-          <Phone className="h-4 w-4" /> {card.phone}
-        </a>
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
-          <BedDouble className="h-4 w-4" /> {card.explainMatch.beds}
-        </span>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button asChild size="sm" className="h-8">
-          <Link
-            to="/hospitals/$hospitalId"
-            params={{ hospitalId: card.hospitalId }}
-            search={{ specialty: card.specialtyContext }}
-          >
-            View full hospital profile
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm" className="h-8">
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(card.address)}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open directions
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <Clock className="h-4 w-4 text-primary" />
+            <span>{card.etaMinutes} min</span>
+            <span className="text-gray-400">•</span>
+            <span>{card.distanceKm} km</span>
+          </div>
+          <a href={`tel:${card.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
+            <Phone className="h-4 w-4" />
+            {card.phone}
           </a>
-        </Button>
-      </div>
-
-      {card.items.doctors.length > 0 && (
-        <div className="mt-3 rounded-lg bg-muted/60 p-3">
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">On-call doctors</p>
-          <ul className="space-y-1.5 text-sm">
-            {card.items.doctors.map((d) => (
-              <li key={d.id} className="flex items-baseline justify-between gap-2">
-                <span>
-                  <span className="font-medium text-foreground">{d.name}</span>
-                  <span className="ml-2 text-muted-foreground">{d.specialty}</span>
-                </span>
-                <span className="text-xs">
-                  {d.room ? (
-                    <span className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">Room {d.room}</span>
-                  ) : (
-                    <span className="text-muted-foreground italic">Room: not on file — call hospital</span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <BedDouble className="h-4 w-4 text-primary" />
+            {card.explainMatch.beds}
+          </div>
         </div>
-      )}
 
-      <Collapsible className="mt-3">
-        <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          Why this match{" "}
-          <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-2 grid gap-1 rounded-md border border-dashed border-border p-2 text-xs text-muted-foreground">
-          <span>
-            <strong className="text-foreground">Specialty:</strong> {card.explainMatch.specialty}
-          </span>
-          <span>
-            <strong className="text-foreground">Distance:</strong> {card.explainMatch.distance}
-          </span>
-          <span>
-            <strong className="text-foreground">Beds:</strong> {card.explainMatch.beds}
-          </span>
-        </CollapsibleContent>
-      </Collapsible>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button asChild size="sm" className="h-8 gap-1">
+            <Link to="/hospitals/$hospitalId" params={{ hospitalId: card.hospitalId }} search={{ specialty: card.specialtyContext }}>
+              View Details
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-8 gap-1">
+            <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(card.address)}`} target="_blank" rel="noreferrer">
+              <Navigation className="h-3 w-3" />
+              Directions
+            </a>
+          </Button>
+        </div>
 
-      <p className="mt-3 text-[11px] text-muted-foreground">
-        Verified from <span className="font-medium">{card.name}</span> directory as of{" "}
-        {new Date(card.verifiedAt).toLocaleString()}
-      </p>
+        {card.items.doctors.length > 0 && (
+          <div className="mt-4 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100/50 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">On-Call Physicians</p>
+            <div className="space-y-2">
+              {card.items.doctors.map((d) => (
+                <div key={d.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {d.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{d.name}</p>
+                      <p className="text-xs text-gray-500">{d.specialty}</p>
+                    </div>
+                  </div>
+                  {d.room ? (
+                    <Badge variant="secondary" className="gap-1">
+                      Room {d.room}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs italic text-gray-400">Call to confirm</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <Collapsible className="mt-3">
+          <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+            Why this match?
+            <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2 rounded-lg border border-dashed border-gray-200 p-3">
+            <div className="grid gap-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Specialty match:</span>
+                <span className="font-medium text-gray-700">{card.explainMatch.specialty}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Distance:</span>
+                <span className="font-medium text-gray-700">{card.explainMatch.distance}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Bed availability:</span>
+                <span className="font-medium text-gray-700">{card.explainMatch.beds}</span>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <p className="mt-3 text-[10px] text-gray-400">
+          Verified {new Date(card.verifiedAt).toLocaleDateString()}
+        </p>
+      </div>
     </div>
   );
 }
 
 async function postChat(input: { message: string; location?: Location }): Promise<ChatResponse> {
-  const triage: TriageResult = await analyzeSymptoms(input.message);
+  const triage: TriageResult = await analyzeSymptoms(
+    input.message,
+    input.location
+      ? { lat: input.location.lat, lng: input.location.lng, radius_km: 40 }
+      : undefined,
+  );
   const cards: HospitalCard[] = triage.recommendedHospitals.map((entry, idx) =>
     toHospitalCard(entry, triage, idx),
   );
@@ -575,7 +783,9 @@ async function postChat(input: { message: string; location?: Location }): Promis
     sessionId: "mock-session",
     assistant: {
       id: `asst-${Date.now()}`,
-      text: `I found ${cards.length} nearby options for ${triage.specialty}. Review the cards below and call ahead to confirm.`,
+      text: cards.length > 0
+        ? `Based on your symptoms, I've found ${cards.length} hospital${cards.length > 1 ? 's' : ''} that can help with ${triage.specialty}. Here are the best matches:`
+        : `I couldn't find hospitals specifically matching your needs. Please call emergency services if this is urgent.`,
       lowConfidence: triage.urgency === "critical" && cards.length === 0,
       cards,
     },
@@ -585,15 +795,15 @@ async function postChat(input: { message: string; location?: Location }): Promis
 function toHospitalCard(entry: RankedHospital, triage: TriageResult, idx: number): HospitalCard {
   const h = entry.hospital;
   const beds = h.beds.icu.available + h.beds.general.available;
-  const loadLevel: HospitalCard["loadLevel"] =
-    beds > 20 ? "low" : beds > 6 ? "medium" : "high";
+  const loadLevel: HospitalCard["loadLevel"] = beds > 20 ? "low" : beds > 6 ? "medium" : "high";
 
   const doctors: DoctorCard[] = [
     {
       id: `${h.id}-doc-1`,
-      name: triage.specialty === "Cardiology" ? "Dr. A. Sharma" : "Dr. R. Patel",
+      name: triage.specialty === "Cardiology" ? "Dr. Bennani (demo)" : "Dr. Tazi (demo)",
       specialty: triage.specialty,
-      room: idx === 0 ? `C-${12 + idx}` : null,
+      room: idx === 0 ? `Suite ${12 + idx}` : null,
+      available: true,
     },
   ];
 
@@ -609,9 +819,11 @@ function toHospitalCard(entry: RankedHospital, triage: TriageResult, idx: number
     explainMatch: {
       specialty: triage.specialty,
       distance: `${h.distanceKm ?? 5} km`,
-      beds: `${h.beds.icu.available} ICU / ${h.beds.general.available} general`,
+      beds: `${h.beds.icu.available} ICU • ${h.beds.general.available} General`,
     },
     items: { doctors },
     specialtyContext: triage.specialty,
+    rating: 4.5,
+    reviews: 128,
   };
 }

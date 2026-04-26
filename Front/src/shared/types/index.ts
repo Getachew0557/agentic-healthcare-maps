@@ -10,6 +10,8 @@ export interface Hospital {
   lat: number;
   lng: number;
   phone: string;
+  /** Public website when different from phone contact */
+  website?: string;
   specialties: string[];
   beds: {
     icu: { total: number; available: number };

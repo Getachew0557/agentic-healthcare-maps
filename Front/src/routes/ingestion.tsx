@@ -10,7 +10,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/ingestion")({
   head: () => ({
     meta: [
-      { title: "Data Ingestion — Agentic Healthcare Maps" },
+      { title: "Data Ingestion — ChatMap" },
       { name: "description", content: "Upload PDFs, CSVs, Excel, or images. We extract structured hospital records using OCR and AI." },
     ],
   }),

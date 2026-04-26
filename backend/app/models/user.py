@@ -11,6 +11,7 @@ from app.db.base import Base
 class UserRole(str, enum.Enum):
     admin = "admin"
     hospital_staff = "hospital_staff"
+    patient = "patient"
 
 
 class User(Base):

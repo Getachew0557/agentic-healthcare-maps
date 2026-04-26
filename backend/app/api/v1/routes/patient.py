@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.routes.hospitals import _build_hospital_out
@@ -15,6 +15,7 @@ from app.schemas.doctor import DoctorOut, RoomAssignmentOut
 from app.schemas.hospital import RecommendationRequest, RecommendationResponse, RecommendationResult
 from app.schemas.patient import TriageRequest, TriageResponse
 from app.services.ranking import rank_hospitals
+from app.services.specialty_match import doctor_specialty_match_or
 from app.services.triage import triage_with_citations
 
 router = APIRouter()
@@ -37,6 +38,19 @@ def _has_emergency_keywords(text: str) -> bool:
     return any(kw in lower for kw in _EMERGENCY_KEYWORDS)
 
 
+def _count_matching_doctors(db: Session, hospital_id: int, specialty: str) -> int:
+    n = db.scalar(
+        select(func.count())
+        .select_from(Doctor)
+        .where(
+            Doctor.hospital_id == hospital_id,
+            Doctor.is_active == True,  # noqa: E712
+            doctor_specialty_match_or(specialty),
+        )
+    )
+    return int(n or 0)
+
+
 def _get_doctors_for_hospital(hospital_id: int, specialty: str, db: Session) -> list[DoctorOut]:
     """
     Return active doctors at a hospital matching the needed specialty.
@@ -46,7 +60,7 @@ def _get_doctors_for_hospital(hospital_id: int, specialty: str, db: Session) -> 
         select(Doctor).where(
             Doctor.hospital_id == hospital_id,
             Doctor.is_active == True,  # noqa: E712
-            Doctor.specialty.ilike(f"%{specialty.replace('_', ' ')}%"),
+            doctor_specialty_match_or(specialty),
         )
     ).all()
 
@@ -159,8 +173,11 @@ ranked by a weighted scoring formula with optional RAG re-ranking.
 
 **Scoring weights (emergency mode):** travel 55%, specialty 25%, beds 15%, ventilators 5%.
 
-**Doctor information:** Each hospital result includes matching doctors with room numbers
-(when assigned). If no room is assigned, `room` is `null` — the AI never invents room numbers.
+**Doctor information:** Re-ranking among **nearest** hospitals, preferring those with at
+least one **matching specialist** in the database. Each result includes doctors whose
+`specialty` matches the triage (synonyms, e.g. `general_medicine` ↔ internal medicine). If no
+hospital in range has a match, the nearest options are still returned (doctors may be empty).
+**Room** is from DB only, or `null` — never invented.
 
 **Typical flow:** call `/triage` first, then pass `specialty` + `urgency` here.
     """,
@@ -174,7 +191,7 @@ async def recommendations(
     all_hospitals_orm = db.scalars(select(Hospital)).all()
     all_hospitals = [_build_hospital_out(h, db) for h in all_hospitals_orm]
 
-    # Step 1: weighted ranking (geo + specialty + beds)
+    # Step 1: weighted ranking within the nearest options (see ranking.py)
     results = await rank_hospitals(
         hospitals=all_hospitals,
         specialty=payload.specialty,
@@ -182,21 +199,30 @@ async def recommendations(
         patient_lat=payload.lat,
         patient_lng=payload.lng,
         radius_km=payload.radius_km,
-        top_n=10,  # get wider pool for RAG re-rank
+        top_n=10,
     )
 
-    # Step 2: RAG re-rank within the candidate pool
+    # Step 2: among nearest options, prefer hospitals with ≥1 doctor matching triage specialty
     if results:
-        candidate_ids = [r.hospital.id for r in results]
+        by_distance = sorted(results, key=lambda r: r.distance_km)[:20]
+        scored: list[tuple[object, int]] = [
+            (r, _count_matching_doctors(db, r.hospital.id, payload.specialty)) for r in by_distance
+        ]
+        with_docs = [r for r, n in scored if n > 0]
+        # If anyone has a matching doctor, RAG only that subset (else keep all, doctors may be empty)
+        pool = with_docs if with_docs else [r for r, _ in scored]
+        pool = pool[:12]
+        candidate_ids = [r.hospital.id for r in pool]
         query = f"{payload.specialty.replace('_', ' ')} hospital near me urgency {payload.urgency}"
         reranked_ids = rerank_by_similarity(
             query_text=query,
             candidate_ids=candidate_ids,
             top_n=3,
         )
-        # Reorder results by RAG ranking
         id_to_result = {r.hospital.id: r for r in results}
         results = [id_to_result[rid] for rid in reranked_ids if rid in id_to_result]
+        # Nearest first among the 3
+        results.sort(key=lambda r: r.distance_km)
 
     # Step 3: attach doctor info (anti-hallucination: room from DB only)
     final_results = []

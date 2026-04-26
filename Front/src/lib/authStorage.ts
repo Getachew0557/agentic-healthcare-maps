@@ -1,13 +1,15 @@
 import type { UserRole } from "@/shared/types";
 
 const KEY = "ahm.auth.token";
+const AUTH_CHANGED_EVENT = "ahm:auth-changed";
 
+/** JWT body from backend (role is server string: admin | hospital_staff | patient). */
 export interface AuthPayload {
   sub: string;
-  email: string;
-  role: UserRole;
-  hospitalId?: string;
-  exp: number; // seconds
+  email?: string;
+  role?: string;
+  hospital_id?: number;
+  exp: number;
 }
 
 /** Tiny base64url helpers — works in browser + node SSR. */
@@ -36,9 +38,13 @@ export function getToken(): string | null {
 export function setToken(token: string) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, token);
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function clearToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(KEY);
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
+
+export { AUTH_CHANGED_EVENT };

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, LogIn, LogOut, Menu, UserPlus } from "lucide-react";
+import { LogIn, LogOut, Menu, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,7 @@ const CLIENT_LINKS = [
   { to: "/map", label: "Nearby Hospitals Map" },
 ] as const;
 
-const APP_LINKS = [
-  { to: "/triage", label: "Triage" },
-  { to: "/map", label: "Map" },
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/ingestion", label: "Ingestion" },
-  { to: "/admin", label: "Admin" },
-] as const;
+const STAFF_ADMIN_LINKS = [{ to: "/dashboard", label: "Dashboard" }] as const;
 
 function NavLink({ to, label, active }: { to: string; label: string; active: boolean }) {
   return (
@@ -44,32 +38,37 @@ export function SiteHeader() {
   const { isAuthenticated, user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const isClientUser = isAuthenticated && user?.role === "patient";
-  const desktopCenterLinks = isClientUser ? CLIENT_LINKS : CENTER_LINKS;
+  const isStaffOrAdmin = isAuthenticated && (user?.role === "staff" || user?.role === "admin");
+  const desktopCenterLinks = isClientUser
+    ? CLIENT_LINKS
+    : isStaffOrAdmin
+      ? STAFF_ADMIN_LINKS
+      : CENTER_LINKS;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-md">
-      <div className="mx-auto grid h-16 max-w-7xl grid-cols-[1fr_auto] items-center gap-3 px-4 md:grid-cols-[1fr_auto_1fr] md:px-8">
+      <div className="mx-auto grid h-16 max-w-7xl grid-cols-[1fr_auto] items-center gap-3 px-4 md:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Link to="/" className="flex min-w-0 items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-glow-primary">
-              <Activity className="h-5 w-5" strokeWidth={2.5} />
-            </div>
+            <img
+              src="/chatmap-logo.png"
+              alt="ChatMap logo"
+              className="h-9 w-9 shrink-0 rounded-lg object-cover shadow-glow-primary"
+            />
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-semibold tracking-tight">Agentic Healthcare Maps</p>
+              <p className="truncate text-sm font-semibold tracking-tight">ChatMap</p>
               <p className="hidden text-[11px] text-muted-foreground sm:block">Clarity in urgent moments</p>
             </div>
           </Link>
         </div>
 
-        {/* Desktop center nav */}
-        <nav className="hidden items-center justify-center gap-1.5 md:flex">
-          {desktopCenterLinks.map((n) => {
-            const active = loc.pathname === n.to || (n.to !== "/" && loc.pathname.startsWith(n.to));
-            return <NavLink key={n.to} to={n.to} label={n.label} active={active} />;
-          })}
-        </nav>
-
         <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+          <nav className="hidden items-center gap-1.5 md:flex">
+            {desktopCenterLinks.map((n) => {
+              const active = loc.pathname === n.to || (n.to !== "/" && loc.pathname.startsWith(n.to));
+              return <NavLink key={n.to} to={n.to} label={n.label} active={active} />;
+            })}
+          </nav>
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
               <span className="hidden max-w-[160px] truncate text-xs text-muted-foreground md:inline" title={user?.email ?? ""}>
@@ -108,7 +107,7 @@ export function SiteHeader() {
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="mt-6 flex flex-col gap-1">
-                {(isClientUser ? CLIENT_LINKS : CENTER_LINKS).map((n) => (
+                {(isClientUser ? CLIENT_LINKS : isStaffOrAdmin ? STAFF_ADMIN_LINKS : CENTER_LINKS).map((n) => (
                   <Link
                     key={n.to}
                     to={n.to}
@@ -120,17 +119,6 @@ export function SiteHeader() {
                 ))}
                 {isAuthenticated && !isClientUser && (
                   <>
-                    <p className="px-3 pt-3 text-xs font-semibold uppercase text-muted-foreground">App</p>
-                    {APP_LINKS.map((n) => (
-                      <Link
-                        key={n.to}
-                        to={n.to}
-                        onClick={() => setOpen(false)}
-                        className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-secondary"
-                      >
-                        {n.label}
-                      </Link>
-                    ))}
                     <button
                       type="button"
                       onClick={() => {
@@ -168,7 +156,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border bg-surface/90">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between md:px-8">
-        <p>© {new Date().getFullYear()} Agentic Healthcare Maps. Hackathon / demo build — not for clinical use.</p>
+        <p>© {new Date().getFullYear()} ChatMap. Hacka-Nation</p>
         <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Link to="/about" className="hover:text-foreground">
             About

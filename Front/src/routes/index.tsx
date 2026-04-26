@@ -23,7 +23,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Agentic Healthcare Maps — Find the right hospital, fast" },
+      { title: "ChatMap — Find the right hospital, fast" },
       {
         name: "description",
         content:
@@ -92,7 +92,7 @@ function Landing() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button asChild size="lg" className="h-12 px-8 text-base shadow-lg transition-all hover:scale-105">
-                <Link to="/login">
+                <Link to="/login" search={{ redirect: undefined }}>
                   Sign in to the app
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -145,7 +145,10 @@ function Landing() {
               { icon: Map, title: "Get matched", desc: "Receive ranked hospital options with live capacity", color: "from-emerald-500 to-teal-500" },
             ].map((step, i) => (
               <div key={i} className="group relative text-center">
-                <div className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-r shadow-lg transition-all group-hover:scale-110" style={{ background: `linear-gradient(135deg, var(--tw-gradient-stops))` }} className={`bg-gradient-to-r ${step.color}`}>
+                <div
+                  className={`relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-r ${step.color} shadow-lg transition-all group-hover:scale-110`}
+                  style={{ background: `linear-gradient(135deg, var(--tw-gradient-stops))` }}
+                >
                   <step.icon className="h-10 w-10 text-white" />
                 </div>
                 <div className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
@@ -314,7 +317,7 @@ function Landing() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" variant="secondary" className="h-12 px-8 text-base shadow-lg transition-all hover:scale-105">
-                <Link to="/login">
+                <Link to="/login" search={{ redirect: undefined }}>
                   Sign in to the demo
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
