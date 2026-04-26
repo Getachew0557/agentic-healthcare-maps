@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { fetchHospitalById } from "@/shared/services/hospitalService";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { StatCard } from "@/shared/components/StatCard";
 import { ArrowLeft, Phone, MapPin, Stethoscope, BedDouble, Activity, Clock, Ambulance, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/hospitals/$hospitalId")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    specialty: typeof search.specialty === "string" ? search.specialty : undefined,
+  }),
   loader: async ({ params }) => {
     const h = await fetchHospitalById(params.hospitalId);
     if (!h) throw notFound();
@@ -30,15 +33,32 @@ export const Route = createFileRoute("/hospitals/$hospitalId")({
 });
 
 function HospitalDetail() {
+  const navigate = useNavigate();
   const h = Route.useLoaderData() as import("@/shared/types").Hospital;
+  const { specialty } = Route.useSearch();
   const totalBeds = h.beds.icu.total + h.beds.general.total;
   const availBeds = h.beds.icu.available + h.beds.general.available;
+  const focusSpecialty = specialty?.trim();
+  const doctors = buildDoctorDirectory(h.specialties, focusSpecialty);
+  const shownDoctors = focusSpecialty
+    ? doctors.filter((d) => d.specialty.toLowerCase() === focusSpecialty.toLowerCase())
+    : doctors;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 md:px-8 md:py-12">
-      <Link to="/map" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Back to map
-      </Link>
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof window !== "undefined" && window.history.length > 1) {
+            window.history.back();
+            return;
+          }
+          navigate({ to: "/map" });
+        }}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -96,16 +116,31 @@ function HospitalDetail() {
 
         <Card className="p-6 lg:col-span-2">
           <h2 className="flex items-center gap-2 text-lg font-semibold"><Stethoscope className="h-5 w-5 text-primary" /> Specialties & doctors</h2>
+          {focusSpecialty && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Showing doctors for the detected condition:{" "}
+              <span className="font-medium text-foreground">{focusSpecialty}</span>
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             {h.specialties.map((s) => (
               <Badge key={s} variant="outline" className="border-primary/20 bg-primary/5 text-primary">{s}</Badge>
             ))}
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {h.specialties.slice(0, 4).map((s, i) => (
-              <div key={s} className="rounded-lg border border-border p-3">
-                <p className="text-sm font-medium">Dr. {["A. Mehta", "S. Iyer", "R. Kulkarni", "P. Shah"][i]}</p>
-                <p className="text-xs text-muted-foreground">{s} • Senior Consultant</p>
+            {shownDoctors.map((doc) => (
+              <div key={doc.id} className="rounded-lg border border-border p-3">
+                <p className="text-sm font-medium">{doc.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {doc.specialty} • {doc.title}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {doc.room ? (
+                    <span className="rounded-md bg-primary/10 px-2 py-0.5 text-primary">Room {doc.room}</span>
+                  ) : (
+                    <span className="italic">Room not on file — call hospital</span>
+                  )}
+                </p>
               </div>
             ))}
           </div>
@@ -149,4 +184,29 @@ function ReadyItem({ ok, label }: { ok: boolean; label: string }) {
       <span className={ok ? "" : "text-muted-foreground"}>{label}</span>
     </li>
   );
+}
+
+type DoctorDirectoryItem = {
+  id: string;
+  name: string;
+  specialty: string;
+  title: string;
+  room: string | null;
+};
+
+function buildDoctorDirectory(
+  specialties: string[],
+  preferredSpecialty?: string,
+): DoctorDirectoryItem[] {
+  const names = ["Dr. A. Mehta", "Dr. S. Iyer", "Dr. R. Kulkarni", "Dr. P. Shah", "Dr. N. Rao"];
+  const source = preferredSpecialty ? [preferredSpecialty, ...specialties] : specialties;
+  const uniqueSpecialties = Array.from(new Set(source)).slice(0, 5);
+
+  return uniqueSpecialties.map((s, i) => ({
+    id: `${s}-${i}`,
+    name: names[i % names.length],
+    specialty: s,
+    title: i % 2 === 0 ? "Senior Consultant" : "Consultant",
+    room: i % 3 === 0 ? null : `D-${21 + i}`,
+  }));
 }

@@ -1,3 +1,6 @@
+/* Must be first: external @import before other rules */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap");
+
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -64,6 +67,8 @@
 
 :root {
   --radius: 0.75rem;
+  --app-font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --app-font-heading: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
 
   /* Healthcare palette: clean white + slate + emerald + blue + emergency red */
   --background: oklch(0.99 0.005 240);
@@ -169,9 +174,22 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "cv11", "ss01";
+    font-family: var(--app-font-sans, "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif);
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
   }
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-heading {
+    font-family: var(
+      --app-font-heading,
+      "Fraunces",
+      ui-serif,
+      Georgia,
+      "Times New Roman",
+      serif
+    );
     letter-spacing: -0.02em;
   }
 }

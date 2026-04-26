@@ -8,7 +8,10 @@ import { clearToken, getToken } from "./authStorage";
  * real backend lands.
  */
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
+  baseURL:
+    import.meta.env.VITE_API_BASE_URL ??
+    import.meta.env.VITE_API_URL ??
+    "http://localhost:8000/api/v1",
   timeout: 15_000,
 });
 

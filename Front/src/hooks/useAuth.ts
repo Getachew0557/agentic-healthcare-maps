@@ -80,6 +80,9 @@ export function useAuth() {
   const logout = useCallback(() => {
     clearToken();
     setUser(null);
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
   }, []);
 
   return {

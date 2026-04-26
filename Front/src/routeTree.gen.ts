@@ -10,10 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TriageRouteImport } from './routes/triage'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IngestionRouteImport } from './routes/ingestion'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HospitalsHospitalIdRouteImport } from './routes/hospitals.$hospitalId'
@@ -22,6 +25,11 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 const TriageRoute = TriageRouteImport.update({
   id: '/triage',
   path: '/triage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapRoute = MapRouteImport.update({
@@ -39,9 +47,19 @@ const IngestionRoute = IngestionRouteImport.update({
   path: '/ingestion',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -66,20 +84,26 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/ingestion': typeof IngestionRoute
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
+  '/signup': typeof SignupRoute
   '/triage': typeof TriageRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/hospitals/$hospitalId': typeof HospitalsHospitalIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/ingestion': typeof IngestionRoute
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
+  '/signup': typeof SignupRoute
   '/triage': typeof TriageRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/hospitals/$hospitalId': typeof HospitalsHospitalIdRoute
@@ -88,10 +112,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/ingestion': typeof IngestionRoute
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
+  '/signup': typeof SignupRoute
   '/triage': typeof TriageRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/hospitals/$hospitalId': typeof HospitalsHospitalIdRoute
@@ -100,20 +127,26 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/admin'
+    | '/contact'
     | '/ingestion'
     | '/login'
     | '/map'
+    | '/signup'
     | '/triage'
     | '/dashboard'
     | '/hospitals/$hospitalId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/admin'
+    | '/contact'
     | '/ingestion'
     | '/login'
     | '/map'
+    | '/signup'
     | '/triage'
     | '/dashboard'
     | '/hospitals/$hospitalId'
@@ -121,10 +154,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/about'
     | '/admin'
+    | '/contact'
     | '/ingestion'
     | '/login'
     | '/map'
+    | '/signup'
     | '/triage'
     | '/_authenticated/dashboard'
     | '/hospitals/$hospitalId'
@@ -133,10 +169,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRoute
+  ContactRoute: typeof ContactRoute
   IngestionRoute: typeof IngestionRoute
   LoginRoute: typeof LoginRoute
   MapRoute: typeof MapRoute
+  SignupRoute: typeof SignupRoute
   TriageRoute: typeof TriageRoute
   HospitalsHospitalIdRoute: typeof HospitalsHospitalIdRoute
 }
@@ -148,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/triage'
       fullPath: '/triage'
       preLoaderRoute: typeof TriageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -171,11 +217,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IngestionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -224,10 +284,13 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AboutRoute: AboutRoute,
   AdminRoute: AdminRoute,
+  ContactRoute: ContactRoute,
   IngestionRoute: IngestionRoute,
   LoginRoute: LoginRoute,
   MapRoute: MapRoute,
+  SignupRoute: SignupRoute,
   TriageRoute: TriageRoute,
   HospitalsHospitalIdRoute: HospitalsHospitalIdRoute,
 }

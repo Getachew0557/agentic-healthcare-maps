@@ -1,17 +1,18 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Activity, User, Stethoscope, ShieldCheck } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Activity } from "lucide-react";
 import { toast } from "sonner";
-import type { UserRole } from "@/shared/types";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { loginSchema, type LoginInput } from "@/lib/schemas";
+import type { UserRole } from "@/shared/types";
+import { apiClient } from "@/lib/apiClient";
+import { setToken } from "@/lib/authStorage";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -20,59 +21,59 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Sign in — Agentic Healthcare Maps" },
-      {
-        name: "description",
-        content: "Sign in as a patient, hospital staff, or administrator.",
-      },
+      { name: "description", content: "Sign in to the Agentic Healthcare Maps demo app." },
     ],
   }),
   component: LoginPage,
 });
 
-const ROLES: {
-  id: UserRole;
-  label: string;
-  desc: string;
-  icon: typeof User;
-  defaultRoute: string;
-}[] = [
-  { id: "patient", label: "Patient", desc: "Find a hospital fast", icon: User, defaultRoute: "/triage" },
-  {
-    id: "staff",
-    label: "Hospital Staff",
-    desc: "Update bed availability",
-    icon: Stethoscope,
-    defaultRoute: "/dashboard",
-  },
-  { id: "admin", label: "Admin", desc: "Network analytics", icon: ShieldCheck, defaultRoute: "/admin" },
-];
+const DEFAULT_ROUTE_BY_ROLE: Record<UserRole, string> = {
+  patient: "/triage",
+  staff: "/dashboard",
+  admin: "/admin",
+};
+
+function inferRoleFromEmail(email: string): UserRole {
+  const value = email.toLowerCase().trim();
+  if (value.includes("admin")) return "admin";
+  if (value.includes("staff") || value.includes("hospital")) return "staff";
+  return "patient";
+}
 
 function LoginPage() {
-  const [role, setRole] = useState<UserRole>("staff");
   const { mockLogin } = useAuth();
   const navigate = useNavigate();
   const search = Route.useSearch();
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "staff@kem.demo", password: "demo1234" },
+    defaultValues: { email: "client@demo.app", password: "demo1234" },
   });
 
-  function onSubmit(values: LoginInput) {
-    mockLogin(values.email, role);
-    toast.success(`Welcome — signed in as ${role}`);
-    const fallback = ROLES.find((r) => r.id === role)!.defaultRoute;
+  async function onSubmit(values: LoginInput) {
+    const role = inferRoleFromEmail(values.email);
+    let mode: "api" | "mock" = "api";
+    try {
+      const response = await apiClient.post<{ access_token: string }>("/auth/login", values);
+      setToken(response.data.access_token);
+      toast.success(`Welcome — signed in via backend as ${role}`);
+    } catch {
+      mode = "mock";
+      mockLogin(values.email, role);
+      toast.warning(`Backend login failed, switched to static ${role} mode`);
+    }
+    const fallback = DEFAULT_ROUTE_BY_ROLE[role];
     const target = search.redirect ?? fallback;
     setTimeout(() => {
       // Use href so external-style redirects also work; navigate for in-app paths.
       if (target.startsWith("http")) window.location.href = target;
       else navigate({ to: target });
-    }, 250);
+    }, mode === "api" ? 100 : 250);
   }
 
   return (
     <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-2">
-      <div className="relative hidden items-center justify-center overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/60 p-12 text-primary-foreground lg:flex">
+      <div className="relative hidden items-center justify-center overflow-hidden bg-primary  p-12 text-primary-foreground lg:flex">
         <div
           className="absolute inset-0 opacity-30"
           style={{
@@ -107,35 +108,18 @@ function LoginPage() {
 
       <div className="flex items-center justify-center bg-background p-6 md:p-10">
         <div className="w-full max-w-md">
-          <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Sign in</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Choose your role to continue. Demo login — credentials prefilled.
+            Dynamic sign-in via backend, with static fallback. Roles are auto-detected from email.
           </p>
 
-          <div className="mt-6 grid gap-2 sm:grid-cols-3">
-            {ROLES.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setRole(r.id)}
-                className={cn(
-                  "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all",
-                  role === r.id
-                    ? "border-primary bg-primary/5 shadow-soft"
-                    : "border-border bg-card hover:bg-secondary/60",
-                )}
-              >
-                <r.icon
-                  className={cn(
-                    "h-4 w-4",
-                    role === r.id ? "text-primary" : "text-muted-foreground",
-                  )}
-                />
-                <p className="text-sm font-semibold">{r.label}</p>
-                <p className="text-[11px] text-muted-foreground">{r.desc}</p>
-              </button>
-            ))}
-          </div>
+          <Alert className="mt-4 border-amber-500/30 bg-amber-500/5">
+            <AlertTitle className="text-foreground/95">Backend + static fallback</AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              We try <code className="rounded bg-muted px-1 py-0.5 text-xs">/auth/login</code> first. If the backend is offline
+              or credentials fail in demo, the app falls back to local mock sign-in so testing can continue.
+            </AlertDescription>
+          </Alert>
 
           <Card className="mt-5 p-6">
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -145,7 +129,7 @@ function LoginPage() {
                   type="email"
                   aria-invalid={!!form.formState.errors.email}
                   {...form.register("email")}
-                  placeholder="you@hospital.org"
+                  placeholder="client@demo.app"
                 />
                 {form.formState.errors.email && (
                   <p className="mt-1 text-xs text-destructive">
@@ -168,10 +152,19 @@ function LoginPage() {
                 )}
               </div>
               <Button type="submit" size="lg" className="w-full shadow-glow-primary">
-                Sign in as {role}
+                Sign in
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                Mock JWT — stored locally, decoded with jwt-decode.
+                Backend token when available; otherwise mock JWT for local role testing.
+              </p>
+              {/* <p className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                Email hints: <strong>admin@...</strong> → admin, <strong>staff@...</strong> or <strong>hospital@...</strong> → hospital staff, otherwise client.
+              </p> */}
+              <p className="text-center text-sm text-muted-foreground">
+                New here?{" "}
+                <Link to="/signup" className="font-medium text-primary underline-offset-2 hover:underline">
+                  Create an account (static)
+                </Link>
               </p>
             </form>
           </Card>
