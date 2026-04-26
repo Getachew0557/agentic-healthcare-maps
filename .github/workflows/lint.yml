@@ -27,10 +27,14 @@ jobs:
 
       - name: Run Ruff linter
         working-directory: backend
-        run: ruff check app/
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: ruff check app/ --fix
 
       - name: Check Black formatting
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
         run: black --check app/
 
   frontend-lint:
