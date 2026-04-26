@@ -32,7 +32,7 @@ def _fallback_triage(symptoms_text: str) -> TriageResult:
     ) or ("सीने" in symptoms_text or "सांस" in symptoms_text)
     stroke = bool(re.search(r"\b(face droop|slurred speech|weakness one side)\b", text))
     trauma = bool(re.search(r"\b(bleeding|unconscious|severe accident|fracture)\b", text))
-    fever = bool(re.search(r"\b(high fever|fever)\b", text))
+    fever = bool(re.search(r"\b(high fever|fever|fiver)\b", text))
 
     if chest:
         return TriageResult(

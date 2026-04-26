@@ -238,6 +238,7 @@ async def ingest_file(
                     ventilators_available=hospital_row.ventilators_available,
                     is_24x7=hospital_row.is_24x7,
                     phone=hospital_row.phone,
+                    website=hospital_row.website,
                     city=parts[0] if parts else "",
                     country=parts[-1] if len(parts) > 1 else "",
                 )

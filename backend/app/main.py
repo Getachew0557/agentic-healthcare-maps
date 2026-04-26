@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,9 +14,22 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Ensure app.* log lines show in the Uvicorn terminal (root is often WARNING-only).
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
+logging.getLogger("app").setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("CHATMAP_DATABASE_URL (resolved): %s", settings.database_url)
+
+    from app.db.migrate import run_alembic_upgrade
+
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, run_alembic_upgrade)
+
     from app.services.realtime.ws_manager import redis_subscriber
 
     task = asyncio.create_task(redis_subscriber(settings.redis_url))
@@ -106,10 +120,46 @@ This system provides decision-support only. It does not diagnose medical conditi
         ],
     )
 
+    # Log before CORS so CORS is registered last and wraps the app + errors (500 then gets ACAO).
+    @app.middleware("http")
+    async def _log_api_requests(request, call_next):
+        # Proves the browser/frontend is hitting the API. Includes CORS preflight (OPTIONS).
+        if not request.url.path.startswith("/api/"):
+            return await call_next(request)
+        t0 = time.perf_counter()
+        origin = request.headers.get("origin", "-")
+        clen = request.headers.get("content-length", "-")
+        q = request.url.query
+        path_q = f"{request.url.path}?{q}" if q else request.url.path
+        has_auth = "yes" if request.headers.get("authorization") else "no"
+        logger.info(
+            "→ %s %s | origin=%s | auth=%s | content-length=%s",
+            request.method,
+            path_q,
+            origin,
+            has_auth,
+            clen,
+        )
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception("✗ unhandled error for %s %s", request.method, path_q)
+            raise
+        ms = (time.perf_counter() - t0) * 1000.0
+        logger.info(
+            "← %s %s → %s (%.0fms)",
+            request.method,
+            path_q,
+            response.status_code,
+            ms,
+        )
+        return response
+
+    # Last middleware = outermost: ensures Access-Control-* on all responses, including 500s.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allow_origins,
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -26,9 +26,11 @@ def _build_hospital_out(hospital: Hospital, db: Session) -> HospitalOut:
     ).all()
     return HospitalOut(
         id=hospital.id,
+        external_id=hospital.external_id,
         name=hospital.name,
         address=hospital.address,
         phone=hospital.phone,
+        website=hospital.website,
         lat=hospital.lat,
         lng=hospital.lng,
         is_24x7=hospital.is_24x7,

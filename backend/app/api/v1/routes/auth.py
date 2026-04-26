@@ -4,7 +4,7 @@ from app.core.auth import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.hospital import Hospital
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, MeResponse, RegisterRequest, TokenResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -16,13 +16,13 @@ router = APIRouter()
 @router.post(
     "/register",
     response_model=MeResponse,
-    summary="Register a hospital staff or admin account",
+    summary="Register a patient or hospital staff account",
     description="""
 Create a new user account.
 
-- `role` must be `hospital_staff` or `admin`
-- `hospital_id` is required for `hospital_staff` — must reference an existing hospital
-- Returns the created user (no token; call `/login` next)
+- `role` must be `patient` or `hospital_staff` (self-service sign-up; no public `admin` registration)
+- `hospital_id` optional; if set, must reference an existing hospital
+- Returns the created user (no token; call `/login` or use a client that logs in immediately)
     """,
     responses={
         200: {
@@ -46,6 +46,16 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    try:
+        role = UserRole(payload.role)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid role")
+    if role not in (UserRole.patient, UserRole.hospital_staff):
+        raise HTTPException(
+            status_code=422,
+            detail="Only patient or hospital_staff can register via this endpoint",
+        )
+
     hospital_id = payload.hospital_id
     if hospital_id is not None:
         hospital = db.get(Hospital, hospital_id)
@@ -55,7 +65,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         email=str(payload.email),
         password_hash=hash_password(payload.password),
-        role=payload.role,
+        role=role,
         hospital_id=hospital_id,
     )
     db.add(user)
@@ -95,7 +105,12 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token(subject=str(user.id))
+    token = create_access_token(
+        subject=str(user.id),
+        email=user.email,
+        role=user.role.value,
+        hospital_id=user.hospital_id,
+    )
     return TokenResponse(access_token=token)
 
 

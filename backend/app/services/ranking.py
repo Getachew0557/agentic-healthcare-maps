@@ -220,7 +220,10 @@ async def rank_hospitals(
             )
         )
 
-    # --- Step 2: sort by score ---
+    # --- Step 2: nearest hospitals first, then best score among them (avoid far "perfect" match) ---
+    candidates.sort(key=lambda c: c.distance_km)
+    nearest_n = min(len(candidates), max(24, top_n * 3))
+    candidates = candidates[:nearest_n]
     candidates.sort(key=lambda c: c.breakdown.total, reverse=True)
     top = candidates[: top_n * 2]  # fetch ETA for a wider pool, then re-trim
 

@@ -1,7 +1,7 @@
 """widen phone to 255
 
 Revision ID: 321a6e4df85d
-Revises: 0001_init
+Revises: 0003_chat_traces
 Create Date: 2026-04-26
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "321a6e4df85d"
-down_revision = "0001_init"
+down_revision = "0003_chat_traces"
 branch_labels = None
 depends_on = None
 

@@ -16,9 +16,11 @@ class SpecialtyOut(BaseModel):
 
 class HospitalOut(BaseModel):
     id: int
+    external_id: str | None = None
     name: str
     address: str
     phone: str | None
+    website: str | None = None
     lat: float
     lng: float
     is_24x7: bool
@@ -42,6 +44,8 @@ class HospitalCreate(BaseModel):
     name: str
     address: str = ""
     phone: str | None = None
+    website: str | None = None
+    external_id: str | None = None
     lat: float
     lng: float
     is_24x7: bool = True
@@ -68,6 +72,7 @@ class HospitalUpdate(BaseModel):
     name: str | None = None
     address: str | None = None
     phone: str | None = None
+    website: str | None = None
     lat: float | None = None
     lng: float | None = None
     is_24x7: bool | None = None

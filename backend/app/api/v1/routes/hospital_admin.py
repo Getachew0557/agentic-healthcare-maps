@@ -152,6 +152,8 @@ def admin_create_hospital(
         name=payload.name,
         address=payload.address,
         phone=payload.phone,
+        website=payload.website,
+        external_id=(payload.external_id.strip() or None) if payload.external_id else None,
         lat=payload.lat,
         lng=payload.lng,
         is_24x7=payload.is_24x7,
@@ -181,18 +183,12 @@ def admin_create_hospital(
 
         parts = [p.strip() for p in hospital.address.split(",")]
         index_hospital(
-            hospital_id=hospital.id,
-            name=hospital.name,
-            address=hospital.address,
-            specialties=list(seen),
-            status=hospital.status.value,
-            icu_available=hospital.icu_available,
-            general_available=hospital.general_available,
-            ventilators_available=hospital.ventilators_available,
-            is_24x7=hospital.is_24x7,
-            phone=hospital.phone,
-            city=parts[0] if parts else "",
-            country=parts[-1] if len(parts) > 1 else "",
+            hospital_id=hospital.id, name=hospital.name, address=hospital.address,
+            specialties=list(seen), status=hospital.status.value,
+            icu_available=hospital.icu_available, general_available=hospital.general_available,
+            ventilators_available=hospital.ventilators_available, is_24x7=hospital.is_24x7,
+            phone=hospital.phone, website=hospital.website,
+            city=parts[0] if parts else "", country=parts[-1] if len(parts) > 1 else "",
         )
     except Exception:
         pass
@@ -293,6 +289,8 @@ def _apply_hospital_update(hospital: Hospital, payload: HospitalUpdate) -> None:
         hospital.address = payload.address.strip()
     if payload.phone is not None:
         hospital.phone = payload.phone.strip() or None
+    if payload.website is not None:
+        hospital.website = payload.website.strip() or None
     if payload.lat is not None:
         hospital.lat = payload.lat
     if payload.lng is not None:
@@ -327,18 +325,12 @@ def _reindex(hospital: Hospital, db: Session) -> None:
         )
         parts = [p.strip() for p in hospital.address.split(",")]
         index_hospital(
-            hospital_id=hospital.id,
-            name=hospital.name,
-            address=hospital.address,
-            specialties=specs,
-            status=hospital.status.value,
-            icu_available=hospital.icu_available,
-            general_available=hospital.general_available,
-            ventilators_available=hospital.ventilators_available,
-            is_24x7=hospital.is_24x7,
-            phone=hospital.phone,
-            city=parts[0] if parts else "",
-            country=parts[-1] if len(parts) > 1 else "",
+            hospital_id=hospital.id, name=hospital.name, address=hospital.address,
+            specialties=specs, status=hospital.status.value,
+            icu_available=hospital.icu_available, general_available=hospital.general_available,
+            ventilators_available=hospital.ventilators_available, is_24x7=hospital.is_24x7,
+            phone=hospital.phone, website=hospital.website,
+            city=parts[0] if parts else "", country=parts[-1] if len(parts) > 1 else "",
         )
     except Exception:
         pass

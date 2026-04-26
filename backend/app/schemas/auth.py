@@ -11,7 +11,7 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
-    role: str = "hospital_staff"
+    role: str = "patient"
     hospital_id: int | None = None
 
 
@@ -36,11 +36,20 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserUpdate(BaseModel):
-    """Admin can update any user's role or hospital assignment."""
+class UserCreate(BaseModel):
+    """Admin creates users (including admin and hospital_staff)."""
+    email: EmailStr
+    password: str
+    role: str = "patient"
+    hospital_id: int | None = None
 
+
+class UserUpdate(BaseModel):
+    """Admin can update any user's role, hospital assignment, email, or password."""
     role: str | None = None
     hospital_id: int | None = None
+    email: EmailStr | None = None
+    password: str | None = None
 
 
 class ContactRequest(BaseModel):
