@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +31,57 @@ class HospitalOut(BaseModel):
     specialties: list[str] = []
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Hospital CRUD schemas (admin + hospital_staff self-service)
+# ---------------------------------------------------------------------------
+
+class HospitalCreate(BaseModel):
+    name: str
+    address: str = ""
+    phone: str | None = None
+    lat: float
+    lng: float
+    is_24x7: bool = True
+    status: str = "normal"
+    icu_total: int = 0
+    icu_available: int = 0
+    general_total: int = 0
+    general_available: int = 0
+    ventilators_available: int = 0
+    specialties: list[str] = []
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def valid_status(cls, v: str) -> str:
+        allowed = {"normal", "busy", "emergency_only"}
+        if v not in allowed:
+            raise ValueError(f"status must be one of {allowed}")
+        return v
+
+
+class HospitalUpdate(BaseModel):
+    """Hospital staff can update their own hospital's profile info."""
+    name: str | None = None
+    address: str | None = None
+    phone: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    is_24x7: bool | None = None
+    status: str | None = None
+    icu_total: int | None = None
+    icu_available: int | None = None
+    general_total: int | None = None
+    general_available: int | None = None
+    ventilators_available: int | None = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def valid_status(cls, v: str | None) -> str | None:
+        if v is not None and v not in {"normal", "busy", "emergency_only"}:
+            raise ValueError("status must be normal | busy | emergency_only")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -78,8 +129,8 @@ class RecommendationResult(BaseModel):
     distance_km: float
     eta_minutes: float | None
     score_breakdown: ScoreBreakdown
-    doctors: list = []   # list[DoctorOut]
-    claims: list = []    # list[Claim] — source of hospital/doctor data
+    doctors: list = []
+    claims: list = []
 
 
 class RecommendationResponse(BaseModel):

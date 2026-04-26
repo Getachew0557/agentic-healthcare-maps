@@ -44,27 +44,34 @@ def create_app() -> FastAPI:
         description="""
 ## Agentic Healthcare Maps — Backend API
 
-AI-powered hospital availability intelligence for patients and hospital staff.
+AI-powered hospital availability intelligence. **Total cost: $0.**
 
-### Key capabilities
-- **Symptom triage** — describe symptoms in plain language (English or Hindi); Gemini extracts the required specialty and urgency level
-- **Medical citations** — Tavily searches PubMed, WHO, Mayo Clinic and returns citable sources
-- **Hospital recommendations** — ranked by travel time, specialty match, bed availability, and ventilator count
-- **Real-time availability** — hospital staff update bed counts via the secure dashboard; changes broadcast instantly via WebSocket
-- **Audit trail** — every availability change is logged with old/new values and the user who made it
+### Endpoints (39 total)
+- **Patient** — symptom triage (Gemini + Tavily), ranked hospital recommendations with RAG re-ranking, doctor names + room numbers
+- **Hospitals** — public directory with specialty/status/geo filters
+- **Doctors** — CRUD + room assignment (anti-hallucination contract)
+- **Admin — Hospital CRUD** — create, update, delete hospitals; hospital_staff self-service
+- **Admin — Users** — list, update role, delete users
+- **Admin — Governance** — audit logs, agent traces, chat sessions, metrics, vector reindex
+- **Ingest** — upload CSV/JSON/Excel/PDF/Image with OCR (Tesseract)
+- **Contact** — public contact form
+- **Realtime** — WebSocket for live availability updates
 
 ### Authentication
-Protected endpoints require a **Bearer JWT** token obtained from `POST /api/v1/auth/login`.
-
 ```
 Authorization: Bearer <token>
 ```
+Obtain token from `POST /api/v1/auth/login`.
 
 ### Roles
 | Role | Permissions |
 |---|---|
-| `hospital_staff` | Update availability for their own hospital only |
-| `admin` | Update availability for any hospital; read all logs |
+| `hospital_staff` | Own hospital: update availability, manage doctors, update profile |
+| `admin` | All hospitals: full CRUD, user management, governance |
+
+### Anti-Hallucination Contract
+Every response includes a `claims` array declaring the source of each field (`db`, `tool`, `fallback`, `unavailable`).
+Doctor room numbers are only shown when they exist in the database — never invented.
 
 ### Decision-support disclaimer
 This system provides decision-support only. It does not diagnose medical conditions.
@@ -76,12 +83,14 @@ This system provides decision-support only. It does not diagnose medical conditi
         license_info={"name": "MIT"},
         lifespan=lifespan,
         openapi_tags=[
-            {"name": "health", "description": "Service liveness check"},
-            {"name": "auth", "description": "Register, login, and inspect the current user"},
-            {"name": "patient", "description": "Symptom triage and hospital recommendations — public, no auth required"},
+            {"name": "health", "description": "Service liveness check — DB + Redis status"},
+            {"name": "auth", "description": "Register, login, get current user"},
+            {"name": "contact", "description": "Public contact form — no auth required"},
+            {"name": "patient", "description": "Symptom triage and hospital recommendations — public"},
             {"name": "hospitals", "description": "Hospital directory — public read access"},
             {"name": "doctors", "description": "Doctor CRUD and room assignments — requires JWT"},
-            {"name": "admin", "description": "Availability updates, audit logs, metrics, vector reindex — requires JWT"},
+            {"name": "admin", "description": "Hospital CRUD, user management, audit logs, metrics — requires JWT"},
+            {"name": "ingest", "description": "File ingestion (CSV/JSON/Excel/PDF/Image) with OCR — admin only"},
             {"name": "realtime", "description": "WebSocket channel for live availability events"},
         ],
     )
