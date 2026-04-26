@@ -1,0 +1,13 @@
+{
+  "model_name": "Random Forest (Baseline)",
+  "f1_score": 1.0,
+  "cv_f1_score": 0.9999901821216435,
+  "metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0
+  },
+  "file_path": "/Workspace/Users/tayebielouai@gmail.com/ML/AI/models/random_forest_baseline.pkl"
+}

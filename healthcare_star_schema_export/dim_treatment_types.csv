@@ -1,0 +1,6 @@
+treatment_type_id,treatment_type,category,severity,typical_cost_range
+1,consultation,Outpatient,Low,$50-$300
+2,diagnostic,Diagnostic,Low-Medium,"$100-$1,500"
+3,therapy,Therapeutic,Medium,$200-$800
+4,emergency care,Emergency,High,"$500-$5,000"
+5,surgery,Surgical,High-Critical,"$2,000-$50,000"
