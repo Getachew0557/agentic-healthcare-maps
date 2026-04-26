@@ -62,4 +62,3 @@ class ContactRequest(BaseModel):
 class ContactResponse(BaseModel):
     status: str
     message: str
-

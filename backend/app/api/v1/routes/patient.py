@@ -17,13 +17,25 @@ from app.schemas.patient import TriageRequest, TriageResponse
 from app.services.ranking import rank_hospitals
 from app.services.specialty_match import doctor_specialty_match_or
 from app.services.triage import triage_with_citations
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 _EMERGENCY_KEYWORDS = (
-    "chest pain", "chest tightness", "difficulty breathing", "shortness of breath",
-    "severe bleeding", "unconscious", "stroke", "heart attack", "not breathing",
-    "सीने में दर्द", "सांस", "बेहोश",
+    "chest pain",
+    "chest tightness",
+    "difficulty breathing",
+    "shortness of breath",
+    "severe bleeding",
+    "unconscious",
+    "stroke",
+    "heart attack",
+    "not breathing",
+    "सीने में दर्द",
+    "सांस",
+    "बेहोश",
 )
 
 _EMERGENCY_PREPEND = (
@@ -121,7 +133,6 @@ async def triage(
     payload: TriageRequest,
     db: Session = Depends(get_db),
 ) -> TriageResponse:
-    import time
     from app.services.trace_logger import log_trace
 
     start = time.monotonic()
@@ -154,7 +165,7 @@ async def triage(
             "confidence": result.confidence,
             "claims": [c.model_dump() for c in result.claims],
         },
-        model="gemini-1.5-flash" if settings.gemini_api_key else "fallback",
+        model="gemini-3-flash-preview" if settings.gemini_api_key else "fallback",
         latency_ms=latency_ms,
         safety_flags={"emergency_keyword_triggered": emergency_triggered},
         db=db,
@@ -232,18 +243,28 @@ async def recommendations(
         claims = [
             {"field": "hospital_name", "source": "db", "value": r.hospital.name},
             {"field": "distance_km", "source": "tool", "value": str(r.distance_km)},
-            {"field": "eta_minutes", "source": "ors" if r.eta_minutes else "unavailable",
-             "value": str(r.eta_minutes) if r.eta_minutes else "not available"},
+            {
+                "field": "eta_minutes",
+                "source": "ors" if r.eta_minutes else "unavailable",
+                "value": str(r.eta_minutes) if r.eta_minutes else "not available",
+            },
             {"field": "icu_available", "source": "db", "value": str(r.hospital.icu_available)},
             {"field": "doctors_count", "source": "db", "value": str(len(doctors))},
         ]
         # Add room claims for each doctor
         for d in doctors:
             if d.room:
-                claims.append({"field": f"doctor_{d.id}_room", "source": "db", "value": d.room.room_code})
+                claims.append(
+                    {"field": f"doctor_{d.id}_room", "source": "db", "value": d.room.room_code}
+                )
             else:
-                claims.append({"field": f"doctor_{d.id}_room", "source": "unavailable",
-                               "value": f"Room not on file. Call {r.hospital.phone or 'hospital'} to confirm."})
+                claims.append(
+                    {
+                        "field": f"doctor_{d.id}_room",
+                        "source": "unavailable",
+                        "value": f"Room not on file. Call {r.hospital.phone or 'hospital'} to confirm.",
+                    }
+                )
 
         final_results.append(
             RecommendationResult(

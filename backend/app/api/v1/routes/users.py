@@ -10,10 +10,6 @@ PATCH  /admin/users/{id}         — update user (role, hospital, email, passwor
 DELETE /admin/users/{id}         — delete user
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.core.auth import require_role
 from app.core.security import hash_password
 from app.db.session import get_db
@@ -94,7 +90,9 @@ def list_users(
         stmt = stmt.where(User.hospital_id == hospital_id)
     stmt = stmt.offset(offset).limit(limit)
     users = db.scalars(stmt).all()
-    return [UserOut(id=u.id, email=u.email, role=u.role.value, hospital_id=u.hospital_id) for u in users]
+    return [
+        UserOut(id=u.id, email=u.email, role=u.role.value, hospital_id=u.hospital_id) for u in users
+    ]
 
 
 @router.get(
@@ -111,7 +109,9 @@ def get_user(
     target = db.get(User, user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserOut(id=target.id, email=target.email, role=target.role.value, hospital_id=target.hospital_id)
+    return UserOut(
+        id=target.id, email=target.email, role=target.role.value, hospital_id=target.hospital_id
+    )
 
 
 @router.patch(
@@ -170,7 +170,9 @@ def update_user(
 
     db.commit()
     db.refresh(target)
-    return UserOut(id=target.id, email=target.email, role=target.role.value, hospital_id=target.hospital_id)
+    return UserOut(
+        id=target.id, email=target.email, role=target.role.value, hospital_id=target.hospital_id
+    )
 
 
 @router.delete(

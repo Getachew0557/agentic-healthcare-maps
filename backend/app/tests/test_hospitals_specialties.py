@@ -1,20 +1,21 @@
 ﻿"""Tests for hospital CRUD, specialty endpoints, geo filter, and health check."""
+
 from __future__ import annotations
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
+from app.core.config import settings as _settings
+from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.specialty import HospitalSpecialty
 from app.models.user import User, UserRole
-from app.core.security import create_access_token, hash_password
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
-TEST_DB_URL = "postgresql+psycopg2://postgres:root@localhost:5432/ahm_test"
+TEST_DB_URL = _settings.test_database_url
 
 _engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
 _TestSession = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
@@ -36,9 +37,11 @@ app.dependency_overrides[get_db] = _override_get_db
 def _wipe():
     db = _TestSession()
     try:
-        db.execute(text(
-            "TRUNCATE TABLE availability_logs, hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
-        ))
+        db.execute(
+            text(
+                "TRUNCATE TABLE availability_logs, hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
+            )
+        )
         db.commit()
     finally:
         db.close()
@@ -57,11 +60,16 @@ def db():
 @pytest.fixture()
 def hospital(db):
     h = Hospital(
-        name="Mumbai General", address="Bandra, Mumbai",
-        lat=19.076, lng=72.877,
-        icu_total=10, icu_available=5,
-        general_total=50, general_available=20,
-        ventilators_available=3, status=HospitalStatus.normal,
+        name="Mumbai General",
+        address="Bandra, Mumbai",
+        lat=19.076,
+        lng=72.877,
+        icu_total=10,
+        icu_available=5,
+        general_total=50,
+        general_available=20,
+        ventilators_available=3,
+        status=HospitalStatus.normal,
     )
     db.add(h)
     db.flush()
@@ -76,11 +84,16 @@ def hospital(db):
 def far_hospital(db):
     # Pune  ~150 km from Mumbai
     h = Hospital(
-        name="Pune Hospital", address="Pune",
-        lat=18.520, lng=73.856,
-        icu_total=8, icu_available=4,
-        general_total=40, general_available=15,
-        ventilators_available=2, status=HospitalStatus.normal,
+        name="Pune Hospital",
+        address="Pune",
+        lat=18.520,
+        lng=73.856,
+        icu_total=8,
+        icu_available=4,
+        general_total=40,
+        general_available=15,
+        ventilators_available=2,
+        status=HospitalStatus.normal,
     )
     db.add(h)
     db.commit()
@@ -124,6 +137,7 @@ def _tok(user):
 # Health endpoint
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_health_returns_ok():
     transport = ASGITransport(app=app)
@@ -140,6 +154,7 @@ async def test_health_returns_ok():
 # ---------------------------------------------------------------------------
 # Hospital list  basic
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_list_hospitals_returns_all(hospital, far_hospital):
@@ -179,6 +194,7 @@ async def test_list_hospitals_filter_status(hospital, far_hospital, db):
 # Hospital list  geo filter
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_geo_filter_includes_nearby(hospital, far_hospital):
     # Patient in Mumbai  50 km radius should include Mumbai General, exclude Pune
@@ -204,6 +220,7 @@ async def test_geo_filter_wide_radius_includes_both(hospital, far_hospital):
 # Get single hospital
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_hospital_by_id(hospital):
     transport = ASGITransport(app=app)
@@ -226,6 +243,7 @@ async def test_get_hospital_not_found():
 # ---------------------------------------------------------------------------
 # Specialty endpoints
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_list_specialties(hospital):
@@ -297,8 +315,9 @@ async def test_staff_cannot_add_specialty_to_other_hospital(staff_user, far_hosp
 @pytest.mark.asyncio
 async def test_delete_specialty(hospital, admin_user, db):
     # Get the cardiology specialty id
-    from sqlalchemy import select
     from app.models.specialty import HospitalSpecialty
+    from sqlalchemy import select
+
     spec = db.scalar(
         select(HospitalSpecialty).where(
             HospitalSpecialty.hospital_id == hospital.id,

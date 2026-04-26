@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-import os
 from logging.config import fileConfig
 
-from alembic import context
-from sqlalchemy import engine_from_config, pool
+import os
+import sys
 
-from app.db.base import Base
-from app.db import models  # noqa: F401
+# Add the parent directory of alembic (backend) to sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from alembic import context
 from app.core.config import settings
+from app.db import models  # noqa: F401
+from app.db.base import Base
+from sqlalchemy import engine_from_config, pool
 
 config = context.config
 
@@ -57,4 +61,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

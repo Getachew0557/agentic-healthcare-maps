@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.core.auth import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.hospital import Hospital
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, MeResponse, RegisterRequest, TokenResponse
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -26,7 +25,18 @@ Create a new user account.
 - Returns the created user (no token; call `/login` or use a client that logs in immediately)
     """,
     responses={
-        200: {"content": {"application/json": {"example": {"id": 1, "email": "staff@hospital.com", "role": "hospital_staff", "hospital_id": 5}}}},
+        200: {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "email": "staff@hospital.com",
+                        "role": "hospital_staff",
+                        "hospital_id": 5,
+                    }
+                }
+            }
+        },
         409: {"description": "Email already registered"},
         400: {"description": "Invalid hospital_id"},
     },
@@ -61,7 +71,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return MeResponse(id=user.id, email=user.email, role=str(user.role.value), hospital_id=user.hospital_id)
+    return MeResponse(
+        id=user.id, email=user.email, role=str(user.role.value), hospital_id=user.hospital_id
+    )
 
 
 @router.post(
@@ -78,7 +90,13 @@ Authorization: Bearer <access_token>
 Token expires after `ACCESS_TOKEN_EXPIRE_MINUTES` (default 60 minutes).
     """,
     responses={
-        200: {"content": {"application/json": {"example": {"access_token": "eyJhbGci...", "token_type": "bearer"}}}},
+        200: {
+            "content": {
+                "application/json": {
+                    "example": {"access_token": "eyJhbGci...", "token_type": "bearer"}
+                }
+            }
+        },
         401: {"description": "Invalid credentials"},
     },
 )
@@ -102,9 +120,22 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     summary="Get current authenticated user",
     description="Returns the profile of the user identified by the Bearer token.",
     responses={
-        200: {"content": {"application/json": {"example": {"id": 1, "email": "staff@hospital.com", "role": "hospital_staff", "hospital_id": 5}}}},
+        200: {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "email": "staff@hospital.com",
+                        "role": "hospital_staff",
+                        "hospital_id": 5,
+                    }
+                }
+            }
+        },
         401: {"description": "Missing or invalid token"},
     },
 )
 def me(user: User = Depends(get_current_user)) -> MeResponse:
-    return MeResponse(id=user.id, email=user.email, role=str(user.role.value), hospital_id=user.hospital_id)
+    return MeResponse(
+        id=user.id, email=user.email, role=str(user.role.value), hospital_id=user.hospital_id
+    )

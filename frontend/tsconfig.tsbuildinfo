@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/api/http.ts","./src/api/patient.ts","./src/pages/admin/admindashboardpage.tsx","./src/pages/admin/adminloginpage.tsx","./src/pages/patient/patienthomepage.tsx","./src/routes/app.tsx"],"version":"5.9.3"}

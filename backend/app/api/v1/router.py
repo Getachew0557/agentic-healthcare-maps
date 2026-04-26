@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
-
 from app.api.v1.routes import (
-    admin, auth, contact, doctors, health,
-    hospital_admin, hospitals, ingest, patient, users, ws,
+    admin,
+    auth,
+    contact,
+    doctors,
+    health,
+    hospital_admin,
+    hospitals,
+    ingest,
+    patient,
+    users,
+    ws,
 )
+from fastapi import APIRouter
 
 api_router = APIRouter()
 

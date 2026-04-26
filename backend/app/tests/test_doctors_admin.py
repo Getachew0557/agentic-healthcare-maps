@@ -1,21 +1,22 @@
 ﻿"""Tests for doctor CRUD, room assignments, admin governance, and RAG."""
+
 from __future__ import annotations
 
 import pytest
+from app.core.config import settings as _settings
+from app.core.security import create_access_token, hash_password
+from app.db.base import Base
+from app.db.session import get_db
+from app.main import app
+from app.models.doctor import Doctor, DoctorRoomAssignment
+from app.models.hospital import Hospital, HospitalStatus
+from app.models.specialty import HospitalSpecialty
+from app.models.user import User, UserRole
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import app
-from app.models.hospital import Hospital, HospitalStatus
-from app.models.specialty import HospitalSpecialty
-from app.models.doctor import Doctor, DoctorRoomAssignment
-from app.models.user import User, UserRole
-from app.core.security import create_access_token, hash_password
-
-TEST_DB_URL = "postgresql+psycopg2://postgres:root@localhost:5432/ahm_test"
+TEST_DB_URL = _settings.test_database_url
 _engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
 _TestSession = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
 Base.metadata.create_all(bind=_engine)
@@ -36,10 +37,12 @@ app.dependency_overrides[get_db] = _override_get_db
 def _wipe():
     db = _TestSession()
     try:
-        db.execute(text(
-            "TRUNCATE TABLE doctor_room_assignments, doctors, availability_logs, "
-            "hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
-        ))
+        db.execute(
+            text(
+                "TRUNCATE TABLE doctor_room_assignments, doctors, availability_logs, "
+                "hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
+            )
+        )
         db.commit()
     finally:
         db.close()
@@ -58,11 +61,16 @@ def db():
 @pytest.fixture()
 def hospital(db):
     h = Hospital(
-        name="Test Hospital", address="Mumbai, Maharashtra, India",
-        lat=19.076, lng=72.877,
-        icu_total=10, icu_available=5,
-        general_total=50, general_available=20,
-        ventilators_available=3, status=HospitalStatus.normal,
+        name="Test Hospital",
+        address="Mumbai, Maharashtra, India",
+        lat=19.076,
+        lng=72.877,
+        icu_total=10,
+        icu_available=5,
+        general_total=50,
+        general_available=20,
+        ventilators_available=3,
+        status=HospitalStatus.normal,
     )
     db.add(h)
     db.flush()
@@ -83,8 +91,12 @@ def admin_user(db):
 
 @pytest.fixture()
 def staff_user(db, hospital):
-    u = User(email="staff@h.com", password_hash=hash_password("pass"),
-             role=UserRole.hospital_staff, hospital_id=hospital.id)
+    u = User(
+        email="staff@h.com",
+        password_hash=hash_password("pass"),
+        role=UserRole.hospital_staff,
+        hospital_id=hospital.id,
+    )
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -98,6 +110,7 @@ def _tok(user):
 # ---------------------------------------------------------------------------
 # Doctor CRUD
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_create_doctor(hospital, admin_user):
@@ -117,7 +130,9 @@ async def test_create_doctor(hospital, admin_user):
 
 @pytest.mark.asyncio
 async def test_list_doctors(hospital, admin_user, db):
-    doctor = Doctor(hospital_id=hospital.id, name="Dr. Jones", specialty="cardiology", is_active=True)
+    doctor = Doctor(
+        hospital_id=hospital.id, name="Dr. Jones", specialty="cardiology", is_active=True
+    )
     db.add(doctor)
     db.commit()
 
@@ -149,7 +164,9 @@ async def test_update_doctor(hospital, admin_user, db):
 
 @pytest.mark.asyncio
 async def test_delete_doctor_soft(hospital, admin_user, db):
-    doctor = Doctor(hospital_id=hospital.id, name="Dr. Gone", specialty="cardiology", is_active=True)
+    doctor = Doctor(
+        hospital_id=hospital.id, name="Dr. Gone", specialty="cardiology", is_active=True
+    )
     db.add(doctor)
     db.commit()
     db.refresh(doctor)
@@ -181,9 +198,18 @@ async def test_create_doctor_requires_auth(hospital):
 
 @pytest.mark.asyncio
 async def test_staff_cannot_add_doctor_to_other_hospital(staff_user, db):
-    other = Hospital(name="Other", address="Pune", lat=18.5, lng=73.8,
-                     icu_total=5, icu_available=2, general_total=20, general_available=10,
-                     ventilators_available=1, status=HospitalStatus.normal)
+    other = Hospital(
+        name="Other",
+        address="Pune",
+        lat=18.5,
+        lng=73.8,
+        icu_total=5,
+        icu_available=2,
+        general_total=20,
+        general_available=10,
+        ventilators_available=1,
+        status=HospitalStatus.normal,
+    )
     db.add(other)
     db.commit()
     db.refresh(other)
@@ -202,9 +228,12 @@ async def test_staff_cannot_add_doctor_to_other_hospital(staff_user, db):
 # Room assignment  anti-hallucination contract
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_assign_room_to_doctor(hospital, admin_user, db):
-    doctor = Doctor(hospital_id=hospital.id, name="Dr. Room", specialty="cardiology", is_active=True)
+    doctor = Doctor(
+        hospital_id=hospital.id, name="Dr. Room", specialty="cardiology", is_active=True
+    )
     db.add(doctor)
     db.commit()
     db.refresh(doctor)
@@ -223,11 +252,18 @@ async def test_assign_room_to_doctor(hospital, admin_user, db):
 
 @pytest.mark.asyncio
 async def test_doctor_room_shown_in_list(hospital, admin_user, db):
-    doctor = Doctor(hospital_id=hospital.id, name="Dr. WithRoom", specialty="cardiology", is_active=True)
+    doctor = Doctor(
+        hospital_id=hospital.id, name="Dr. WithRoom", specialty="cardiology", is_active=True
+    )
     db.add(doctor)
     db.flush()
-    ra = DoctorRoomAssignment(doctor_id=doctor.id, hospital_id=hospital.id,
-                               room_code="304", room_type="consultation", is_active=True)
+    ra = DoctorRoomAssignment(
+        doctor_id=doctor.id,
+        hospital_id=hospital.id,
+        room_code="304",
+        room_type="consultation",
+        is_active=True,
+    )
     db.add(ra)
     db.commit()
 
@@ -242,7 +278,9 @@ async def test_doctor_room_shown_in_list(hospital, admin_user, db):
 
 @pytest.mark.asyncio
 async def test_doctor_without_room_returns_null(hospital, admin_user, db):
-    doctor = Doctor(hospital_id=hospital.id, name="Dr. NoRoom", specialty="cardiology", is_active=True)
+    doctor = Doctor(
+        hospital_id=hospital.id, name="Dr. NoRoom", specialty="cardiology", is_active=True
+    )
     db.add(doctor)
     db.commit()
 
@@ -258,8 +296,9 @@ async def test_remove_room_assignment(hospital, admin_user, db):
     doctor = Doctor(hospital_id=hospital.id, name="Dr. Rm", specialty="cardiology", is_active=True)
     db.add(doctor)
     db.flush()
-    ra = DoctorRoomAssignment(doctor_id=doctor.id, hospital_id=hospital.id,
-                               room_code="101", is_active=True)
+    ra = DoctorRoomAssignment(
+        doctor_id=doctor.id, hospital_id=hospital.id, room_code="101", is_active=True
+    )
     db.add(ra)
     db.commit()
     db.refresh(doctor)
@@ -280,6 +319,7 @@ async def test_remove_room_assignment(hospital, admin_user, db):
 # ---------------------------------------------------------------------------
 # Admin governance endpoints
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_global_audit_requires_admin(staff_user):
@@ -334,6 +374,7 @@ async def test_metrics_requires_admin(staff_user):
 # ---------------------------------------------------------------------------
 # Emergency keyword safety pipeline
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_triage_emergency_keyword_prepend():

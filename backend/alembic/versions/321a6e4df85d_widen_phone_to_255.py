@@ -4,6 +4,7 @@ Revision ID: 321a6e4df85d
 Revises: 0003_chat_traces
 Create Date: 2026-04-26
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

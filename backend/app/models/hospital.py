@@ -28,11 +28,12 @@ class Hospital(Base):
     lng: Mapped[float] = mapped_column(Float)
 
     is_24x7: Mapped[bool] = mapped_column(Boolean, default=True)
-    status: Mapped[HospitalStatus] = mapped_column(Enum(HospitalStatus), default=HospitalStatus.normal)
+    status: Mapped[HospitalStatus] = mapped_column(
+        Enum(HospitalStatus), default=HospitalStatus.normal
+    )
 
     icu_total: Mapped[int] = mapped_column(Integer, default=0)
     icu_available: Mapped[int] = mapped_column(Integer, default=0)
     general_total: Mapped[int] = mapped_column(Integer, default=0)
     general_available: Mapped[int] = mapped_column(Integer, default=0)
     ventilators_available: Mapped[int] = mapped_column(Integer, default=0)
-

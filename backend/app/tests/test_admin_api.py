@@ -1,11 +1,14 @@
 ﻿"""Tests for admin availability update endpoint  runs against Postgres."""
+
 from __future__ import annotations
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, select, text
-from sqlalchemy.orm import sessionmaker
 
+# ---------------------------------------------------------------------------
+# Test DB  dedicated Postgres test database
+# ---------------------------------------------------------------------------
+from app.core.config import settings as _settings
+from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
@@ -13,17 +16,17 @@ from app.models.availability_log import AvailabilityLog
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.specialty import HospitalSpecialty
 from app.models.user import User, UserRole
-from app.core.security import create_access_token, hash_password
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.orm import sessionmaker
 
-# ---------------------------------------------------------------------------
-# Test DB  dedicated Postgres test database
-# ---------------------------------------------------------------------------
+TEST_DB_URL = _settings.test_database_url
 
-TEST_DB_URL = "postgresql+psycopg2://postgres:root@localhost:5432/ahm_test"
 
 # Create test DB if it does not exist (run once at import time)
 def _ensure_test_db() -> None:
     import psycopg2
+
     conn = psycopg2.connect(host="localhost", user="postgres", password="root", dbname="postgres")
     conn.autocommit = True
     cur = conn.cursor()
@@ -31,6 +34,7 @@ def _ensure_test_db() -> None:
     if not cur.fetchone():
         cur.execute("CREATE DATABASE ahm_test")
     conn.close()
+
 
 _ensure_test_db()
 
@@ -56,7 +60,11 @@ def _wipe():
     db = _TestSession()
     try:
         # Disable FK checks, truncate all, re-enable
-        db.execute(text("TRUNCATE TABLE availability_logs, hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"))
+        db.execute(
+            text(
+                "TRUNCATE TABLE availability_logs, hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
+            )
+        )
         db.commit()
     finally:
         db.close()
@@ -75,11 +83,16 @@ def db():
 @pytest.fixture()
 def hospital(db):
     h = Hospital(
-        name="Test Hospital", address="Mumbai",
-        lat=19.076, lng=72.877,
-        icu_total=10, icu_available=5,
-        general_total=50, general_available=20,
-        ventilators_available=3, status=HospitalStatus.normal,
+        name="Test Hospital",
+        address="Mumbai",
+        lat=19.076,
+        lng=72.877,
+        icu_total=10,
+        icu_available=5,
+        general_total=50,
+        general_available=20,
+        ventilators_available=3,
+        status=HospitalStatus.normal,
     )
     db.add(h)
     db.flush()
@@ -92,11 +105,16 @@ def hospital(db):
 @pytest.fixture()
 def other_hospital(db):
     h = Hospital(
-        name="Other Hospital", address="Pune",
-        lat=18.520, lng=73.856,
-        icu_total=8, icu_available=4,
-        general_total=40, general_available=15,
-        ventilators_available=2, status=HospitalStatus.normal,
+        name="Other Hospital",
+        address="Pune",
+        lat=18.520,
+        lng=73.856,
+        icu_total=8,
+        icu_available=4,
+        general_total=40,
+        general_available=15,
+        ventilators_available=2,
+        status=HospitalStatus.normal,
     )
     db.add(h)
     db.commit()
@@ -139,6 +157,7 @@ def _tok(user):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_requires_auth(hospital):

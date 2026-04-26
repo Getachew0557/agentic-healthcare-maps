@@ -1,19 +1,20 @@
 ﻿"""Tests for admin hospital CRUD, user management, and contact form."""
+
 from __future__ import annotations
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
+from app.core.config import settings as _settings
+from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.user import User, UserRole
-from app.core.security import create_access_token, hash_password
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
-TEST_DB_URL = "postgresql+psycopg2://postgres:root@localhost:5432/ahm_test"
+TEST_DB_URL = _settings.test_database_url
 _engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
 _TestSession = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
 Base.metadata.create_all(bind=_engine)
@@ -34,11 +35,13 @@ app.dependency_overrides[get_db] = _override_get_db
 def _wipe():
     db = _TestSession()
     try:
-        db.execute(text(
-            "TRUNCATE TABLE agent_traces, chat_messages, chat_sessions, "
-            "doctor_room_assignments, doctors, availability_logs, "
-            "hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
-        ))
+        db.execute(
+            text(
+                "TRUNCATE TABLE agent_traces, chat_messages, chat_sessions, "
+                "doctor_room_assignments, doctors, availability_logs, "
+                "hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
+            )
+        )
         db.commit()
     finally:
         db.close()
@@ -56,10 +59,18 @@ def db():
 
 @pytest.fixture()
 def hospital(db):
-    h = Hospital(name="Test Hospital", address="Mumbai, India",
-                 lat=19.076, lng=72.877, icu_total=10, icu_available=5,
-                 general_total=50, general_available=20, ventilators_available=3,
-                 status=HospitalStatus.normal)
+    h = Hospital(
+        name="Test Hospital",
+        address="Mumbai, India",
+        lat=19.076,
+        lng=72.877,
+        icu_total=10,
+        icu_available=5,
+        general_total=50,
+        general_available=20,
+        ventilators_available=3,
+        status=HospitalStatus.normal,
+    )
     db.add(h)
     db.commit()
     db.refresh(h)
@@ -77,8 +88,12 @@ def admin_user(db):
 
 @pytest.fixture()
 def staff_user(db, hospital):
-    u = User(email="staff@h.com", password_hash=hash_password("pass"),
-             role=UserRole.hospital_staff, hospital_id=hospital.id)
+    u = User(
+        email="staff@h.com",
+        password_hash=hash_password("pass"),
+        role=UserRole.hospital_staff,
+        hospital_id=hospital.id,
+    )
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -93,12 +108,14 @@ def _tok(user):
 # Admin Hospital CRUD
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_admin_list_hospitals(hospital, admin_user):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        res = await c.get("/api/v1/admin/hospitals",
-                          headers={"Authorization": f"Bearer {_tok(admin_user)}"})
+        res = await c.get(
+            "/api/v1/admin/hospitals", headers={"Authorization": f"Bearer {_tok(admin_user)}"}
+        )
     assert res.status_code == 200
     assert len(res.json()) >= 1
 
@@ -107,8 +124,9 @@ async def test_admin_list_hospitals(hospital, admin_user):
 async def test_admin_list_hospitals_requires_admin(staff_user):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        res = await c.get("/api/v1/admin/hospitals",
-                          headers={"Authorization": f"Bearer {_tok(staff_user)}"})
+        res = await c.get(
+            "/api/v1/admin/hospitals", headers={"Authorization": f"Bearer {_tok(staff_user)}"}
+        )
     assert res.status_code == 403
 
 
@@ -118,10 +136,18 @@ async def test_admin_create_hospital(admin_user):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         res = await c.post(
             "/api/v1/admin/hospitals",
-            json={"name": "New Hospital", "address": "Delhi, India",
-                  "lat": 28.6, "lng": 77.2, "icu_total": 10, "icu_available": 5,
-                  "general_total": 50, "general_available": 20,
-                  "ventilators_available": 3, "specialties": ["cardiology", "emergency"]},
+            json={
+                "name": "New Hospital",
+                "address": "Delhi, India",
+                "lat": 28.6,
+                "lng": 77.2,
+                "icu_total": 10,
+                "icu_available": 5,
+                "general_total": 50,
+                "general_available": 20,
+                "ventilators_available": 3,
+                "specialties": ["cardiology", "emergency"],
+            },
             headers={"Authorization": f"Bearer {_tok(admin_user)}"},
         )
     assert res.status_code == 201
@@ -168,6 +194,7 @@ async def test_admin_delete_hospital(hospital, admin_user, db):
     assert res.status_code == 204
     # Use a fresh query — db.get() raises ObjectDeletedError on deleted rows
     from sqlalchemy import select as sa_select
+
     db.expire_all()
     result = db.scalar(sa_select(Hospital).where(Hospital.id == hospital_id))
     assert result is None
@@ -177,12 +204,14 @@ async def test_admin_delete_hospital(hospital, admin_user, db):
 # Hospital staff self-service
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_staff_get_own_hospital(hospital, staff_user):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        res = await c.get("/api/v1/admin/hospitals/me",
-                          headers={"Authorization": f"Bearer {_tok(staff_user)}"})
+        res = await c.get(
+            "/api/v1/admin/hospitals/me", headers={"Authorization": f"Bearer {_tok(staff_user)}"}
+        )
     assert res.status_code == 200
     assert res.json()["id"] == hospital.id
 
@@ -204,12 +233,14 @@ async def test_staff_update_own_hospital(hospital, staff_user):
 # Admin User Management
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_admin_list_users(admin_user, staff_user):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        res = await c.get("/api/v1/admin/users",
-                          headers={"Authorization": f"Bearer {_tok(admin_user)}"})
+        res = await c.get(
+            "/api/v1/admin/users", headers={"Authorization": f"Bearer {_tok(admin_user)}"}
+        )
     assert res.status_code == 200
     assert len(res.json()) >= 2
 
@@ -218,8 +249,10 @@ async def test_admin_list_users(admin_user, staff_user):
 async def test_admin_list_users_filter_by_role(admin_user, staff_user):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        res = await c.get("/api/v1/admin/users?role=hospital_staff",
-                          headers={"Authorization": f"Bearer {_tok(admin_user)}"})
+        res = await c.get(
+            "/api/v1/admin/users?role=hospital_staff",
+            headers={"Authorization": f"Bearer {_tok(admin_user)}"},
+        )
     assert res.status_code == 200
     assert all(u["role"] == "hospital_staff" for u in res.json())
 
@@ -248,6 +281,7 @@ async def test_admin_delete_user(admin_user, staff_user, db):
         )
     assert res.status_code == 204
     from sqlalchemy import select as sa_select
+
     db.expire_all()
     result = db.scalar(sa_select(User).where(User.id == user_id))
     assert result is None
@@ -268,8 +302,9 @@ async def test_admin_cannot_delete_self(admin_user):
 async def test_user_management_requires_admin(staff_user):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        res = await c.get("/api/v1/admin/users",
-                          headers={"Authorization": f"Bearer {_tok(staff_user)}"})
+        res = await c.get(
+            "/api/v1/admin/users", headers={"Authorization": f"Bearer {_tok(staff_user)}"}
+        )
     assert res.status_code == 403
 
 
@@ -277,14 +312,19 @@ async def test_user_management_requires_admin(staff_user):
 # Contact form
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_contact_form_no_auth_required():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         res = await c.post(
             "/api/v1/contact",
-            json={"name": "Dr. Test", "email": "test@hospital.com",
-                  "subject": "Join platform", "message": "We want to register our hospital."},
+            json={
+                "name": "Dr. Test",
+                "email": "test@hospital.com",
+                "subject": "Join platform",
+                "message": "We want to register our hospital.",
+            },
         )
     assert res.status_code == 200
     body = res.json()
@@ -298,9 +338,6 @@ async def test_contact_form_invalid_email():
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         res = await c.post(
             "/api/v1/contact",
-            json={"name": "Test", "email": "not-an-email",
-                  "subject": "Test", "message": "Hello"},
+            json={"name": "Test", "email": "not-an-email", "subject": "Test", "message": "Hello"},
         )
     assert res.status_code == 422
-
-

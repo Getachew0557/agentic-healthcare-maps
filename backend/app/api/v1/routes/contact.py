@@ -12,11 +12,10 @@ For production: wire to an email service (SendGrid, SES, etc.)
 
 import logging
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
 from app.db.session import get_db
 from app.schemas.auth import ContactRequest, ContactResponse
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +59,7 @@ async def contact(
     # Log the contact submission as an agent trace for admin visibility
     try:
         from app.models.chat import AgentTrace
+
         trace = AgentTrace(
             tools_called={"type": "contact_form"},
             final_answer_json={

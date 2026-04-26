@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.core.config import settings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -28,4 +29,3 @@ def get_db():
         yield db
     finally:
         db.close()
-

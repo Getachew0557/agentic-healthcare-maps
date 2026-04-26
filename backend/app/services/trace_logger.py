@@ -9,7 +9,6 @@ Usage:
 """
 
 import logging
-import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ def log_trace(
     tools_called: dict[str, Any],
     retrievals: dict[str, Any] | None = None,
     final_answer_json: dict[str, Any],
-    model: str = "gemini-1.5-flash",
+    model: str = "gemini-3-flash-preview",
     latency_ms: int = 0,
     safety_flags: dict[str, Any] | None = None,
     db=None,
@@ -33,6 +32,7 @@ def log_trace(
         return
     try:
         from app.models.chat import AgentTrace
+
         trace = AgentTrace(
             tools_called=tools_called,
             retrievals=retrievals or {},

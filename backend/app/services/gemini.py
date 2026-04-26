@@ -1,83 +1,71 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 from typing import Any
-
-import httpx
 
 from app.core.config import settings
 
 
 async def gemini_triage(symptoms_text: str) -> dict[str, Any]:
     """
-    Calls Gemini via REST (no extra SDK dependency).
+    Calls Gemini via the official google-genai SDK.
+
+    Uses the exact format from the official documentation:
+        from google import genai
+        client = genai.Client()
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents="...",
+        )
+
     Returns a dict shaped like:
-      { specialty: str, urgency: str, confidence: float, rationale: str }
+        { specialty: str, urgency: str, confidence: float, rationale: str }
 
     Anti-hallucination policy:
-    - We only accept JSON output (strict parse).
-    - If parsing fails, caller must fallback deterministically.
+    - JSON-only output enforced via prompt.
+    - If parsing fails, caller falls back deterministically.
     """
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
 
-    # Gemini Generative Language API endpoint (v1beta).
-    # Note: this is a lightweight implementation; if Google changes the API, adjust here.
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-1.5-flash:generateContent"
-    )
+    # The SDK reads GOOGLE_API_KEY from the environment automatically.
+    os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
 
-    system = (
+    from google import genai
+
+    client = genai.Client()
+
+    prompt = (
         "You are a medical triage assistant for decision-support only. "
-        "Do NOT diagnose. Output must be valid JSON only."
+        "Do NOT diagnose. Output must be valid JSON only.\n\n"
+        "Extract the required medical specialty and urgency from patient symptoms.\n\n"
+        "Rules:\n"
+        "- Output JSON only.\n"
+        '- urgency must be one of: "normal" | "urgent" | "emergency"\n'
+        "- specialty must be a short snake_case string "
+        "(examples: cardiology, neurology, emergency, general_medicine, pediatrics)\n"
+        "- confidence must be 0..1\n"
+        "- rationale must be <= 20 words, no medical diagnosis claims.\n\n"
+        f"Symptoms:\n{symptoms_text}\n\n"
+        'Return JSON:\n{"specialty":"...", "urgency":"...", "confidence":0.0, "rationale":"..."}'
     )
-    prompt = f"""
-Extract the required medical specialty and urgency from patient symptoms.
 
-Rules:
-- Output JSON only.
-- urgency must be one of: "normal" | "urgent" | "emergency"
-- specialty must be a short snake_case string (examples: cardiology, neurology, emergency, general_medicine, pediatrics)
-- confidence must be 0..1
-- rationale must be <= 20 words, no medical diagnosis claims.
+    def _call() -> str:
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=prompt,
+        )
+        return response.text
 
-Symptoms:
-{symptoms_text}
+    text = await asyncio.to_thread(_call)
 
-Return JSON:
-{{"specialty":"...", "urgency":"...", "confidence":0.0, "rationale":"..."}}
-""".strip()
-
-    body = {
-        "contents": [
-            {"role": "user", "parts": [{"text": system + "\n\n" + prompt}]},
-        ],
-        "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 256,
-        },
-    }
-
-    async with httpx.AsyncClient(timeout=20) as client:
-        res = await client.post(url, params={"key": settings.gemini_api_key}, json=body)
-        res.raise_for_status()
-        data = res.json()
-
-    # Extract text from candidates
-    text = (
-        data.get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [{}])[0]
-        .get("text", "")
-    )
     if not text:
         raise RuntimeError("Gemini returned empty response")
 
-    # Some models wrap JSON in fences; strip common wrappers.
+    # Strip markdown code fences if present
     cleaned = text.strip()
     cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
-    parsed = json.loads(cleaned)
-    return parsed
-
+    return json.loads(cleaned)

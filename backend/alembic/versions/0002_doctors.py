@@ -4,6 +4,7 @@ Revision ID: 0002_doctors
 Revises: 0001_init
 Create Date: 2026-04-26
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

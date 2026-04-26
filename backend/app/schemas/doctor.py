@@ -4,10 +4,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
-
 # ---------------------------------------------------------------------------
 # Doctor schemas
 # ---------------------------------------------------------------------------
+
 
 class DoctorCreate(BaseModel):
     name: str
@@ -31,7 +31,7 @@ class DoctorUpdate(BaseModel):
 
 class RoomAssignmentCreate(BaseModel):
     room_code: str
-    room_type: str | None = None   # "consultation" | "icu" | "ward"
+    room_type: str | None = None  # "consultation" | "icu" | "ward"
 
     @field_validator("room_code", mode="before")
     @classmethod
@@ -59,7 +59,7 @@ class DoctorOut(BaseModel):
     specialty: str
     phone: str | None
     is_active: bool
-    room: RoomAssignmentOut | None   # active room assignment, None if not assigned
+    room: RoomAssignmentOut | None  # active room assignment, None if not assigned
     created_at: datetime
     updated_at: datetime
 

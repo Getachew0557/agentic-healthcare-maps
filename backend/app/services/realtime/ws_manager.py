@@ -65,6 +65,7 @@ manager = ConnectionManager()
 # Redis pub/sub subscriber (runs as a background task on startup)
 # ---------------------------------------------------------------------------
 
+
 async def redis_subscriber(redis_url: str) -> None:
     """
     Long-running coroutine: subscribes to REDIS_CHANNEL and fans out
@@ -117,6 +118,7 @@ async def redis_subscriber(redis_url: str) -> None:
 # ---------------------------------------------------------------------------
 # Publish helper (called from admin route after DB update)
 # ---------------------------------------------------------------------------
+
 
 async def broadcast_availability_update(
     *,

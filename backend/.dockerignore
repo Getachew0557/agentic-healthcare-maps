@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local DB and vector index (built inside container)
+*.db
+app.db
+chroma_data/
+chroma_test/
+
+# Secrets — never bake into image
+.env
+
+# Dev artifacts
+*.log
+.DS_Store

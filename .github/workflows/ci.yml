@@ -1,0 +1,90 @@
+name: CI — Backend Tests
+
+on:
+  push:
+    branches: [main, backend, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main, backend]
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    name: Backend Tests (Python 3.11)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ahm_test
+          POSTGRES_PASSWORD: ahm_test
+          POSTGRES_DB: ahm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://ahm_test:ahm_test@localhost:5432/ahm_test
+      JWT_SECRET: ci_test_secret_not_for_production
+      JWT_ALG: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      REDIS_URL: redis://localhost:6379/0
+      CHROMA_PERSIST_DIR: /tmp/chroma_ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            poppler-utils \
+            libpq-dev
+
+      - name: Install Python dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run Alembic migrations
+        working-directory: backend
+        run: alembic upgrade heads
+
+      - name: Run tests
+        working-directory: backend
+        run: |
+          python -m pytest app/tests/ \
+            --ignore=app/tests/test_chat_live.py \
+            --ignore=app/tests/test_gemini_live.py \
+            -v \
+            --tb=short \
+            -q
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: backend/.pytest_cache/
+          retention-days: 7
