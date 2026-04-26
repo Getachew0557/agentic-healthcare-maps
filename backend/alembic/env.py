@@ -4,9 +4,10 @@ from logging.config import fileConfig
 
 import os
 import sys
+from pathlib import Path
 
 # Add the parent directory of alembic (backend) to sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from alembic import context
 from app.core.config import settings
