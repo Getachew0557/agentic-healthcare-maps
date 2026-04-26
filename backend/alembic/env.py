@@ -1,22 +1,19 @@
 from __future__ import annotations
 
+from logging.config import fileConfig
+
 import os
 import sys
-from logging.config import fileConfig
 from pathlib import Path
 
-# Ensure 'backend/' is on sys.path so 'app' package is importable
-# Works whether alembic is run from backend/ or from the repo root
-_backend_dir = Path(__file__).resolve().parent.parent
-if str(_backend_dir) not in sys.path:
-    sys.path.insert(0, str(_backend_dir))
+# Add the parent directory of alembic (backend) to sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-
 from app.core.config import settings
 from app.db import models  # noqa: F401
 from app.db.base import Base
+from sqlalchemy import engine_from_config, pool
 
 config = context.config
 
