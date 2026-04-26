@@ -15,7 +15,7 @@ class TriageResult:
     urgency: str
     confidence: float
     rationale: str
-    source: str = "fallback"   # "gemini" | "fallback"
+    source: str = "fallback"  # "gemini" | "fallback"
 
 
 def _fallback_triage(symptoms_text: str) -> TriageResult:
@@ -25,28 +25,55 @@ def _fallback_triage(symptoms_text: str) -> TriageResult:
     """
     text = symptoms_text.lower()
 
-    chest = bool(re.search(r"\b(chest pain|chest tightness|shortness of breath|difficulty breathing)\b", text)) or (
-        "सीने" in symptoms_text or "सांस" in symptoms_text
-    )
+    chest = bool(
+        re.search(
+            r"\b(chest pain|chest tightness|shortness of breath|difficulty breathing)\b", text
+        )
+    ) or ("सीने" in symptoms_text or "सांस" in symptoms_text)
     stroke = bool(re.search(r"\b(face droop|slurred speech|weakness one side)\b", text))
     trauma = bool(re.search(r"\b(bleeding|unconscious|severe accident|fracture)\b", text))
     fever = bool(re.search(r"\b(high fever|fever)\b", text))
 
     if chest:
-        return TriageResult(specialty="cardiology", urgency="emergency", confidence=0.78,
-                            rationale="Symptoms suggest possible cardiac/respiratory emergency; prioritize nearest capable hospital.", source="fallback")
+        return TriageResult(
+            specialty="cardiology",
+            urgency="emergency",
+            confidence=0.78,
+            rationale="Symptoms suggest possible cardiac/respiratory emergency; prioritize nearest capable hospital.",
+            source="fallback",
+        )
     if stroke:
-        return TriageResult(specialty="neurology", urgency="emergency", confidence=0.75,
-                            rationale="Possible stroke warning signs; time-sensitive care recommended.", source="fallback")
+        return TriageResult(
+            specialty="neurology",
+            urgency="emergency",
+            confidence=0.75,
+            rationale="Possible stroke warning signs; time-sensitive care recommended.",
+            source="fallback",
+        )
     if trauma:
-        return TriageResult(specialty="emergency", urgency="emergency", confidence=0.74,
-                            rationale="Possible trauma; emergency services likely required.", source="fallback")
+        return TriageResult(
+            specialty="emergency",
+            urgency="emergency",
+            confidence=0.74,
+            rationale="Possible trauma; emergency services likely required.",
+            source="fallback",
+        )
     if fever:
-        return TriageResult(specialty="general_medicine", urgency="urgent", confidence=0.62,
-                            rationale="Fever-related symptoms; evaluation recommended.", source="fallback")
+        return TriageResult(
+            specialty="general_medicine",
+            urgency="urgent",
+            confidence=0.62,
+            rationale="Fever-related symptoms; evaluation recommended.",
+            source="fallback",
+        )
 
-    return TriageResult(specialty="general_medicine", urgency="normal", confidence=0.55,
-                        rationale="General triage fallback; collect more details if symptoms worsen.", source="fallback")
+    return TriageResult(
+        specialty="general_medicine",
+        urgency="normal",
+        confidence=0.55,
+        rationale="General triage fallback; collect more details if symptoms worsen.",
+        source="fallback",
+    )
 
 
 async def triage_with_citations(symptoms_text: str) -> TriageResponse:
@@ -81,8 +108,11 @@ async def triage_with_citations(symptoms_text: str) -> TriageResponse:
         Claim(field="specialty", source=result.source, value=result.specialty),
         Claim(field="urgency", source=result.source, value=result.urgency),
         Claim(field="confidence", source=result.source, value=str(round(result.confidence, 2))),
-        Claim(field="citations", source="tavily" if citations else "unavailable",
-              value=f"{len(citations)} sources"),
+        Claim(
+            field="citations",
+            source="tavily" if citations else "unavailable",
+            value=f"{len(citations)} sources",
+        ),
     ]
 
     return TriageResponse(
@@ -93,4 +123,3 @@ async def triage_with_citations(symptoms_text: str) -> TriageResponse:
         citations=citations,
         claims=claims,
     )
-

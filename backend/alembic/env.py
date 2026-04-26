@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-from app.db.base import Base
-from app.db import models  # noqa: F401
 from app.core.config import settings
+from app.db import models  # noqa: F401
+from app.db.base import Base
+from sqlalchemy import engine_from_config, pool
 
 config = context.config
 
@@ -57,4 +55,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

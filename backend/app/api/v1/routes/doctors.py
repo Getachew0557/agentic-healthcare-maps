@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from app.core.auth import get_current_user, require_role
+from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.doctor import Doctor, DoctorRoomAssignment
 from app.models.hospital import Hospital
@@ -16,6 +12,9 @@ from app.schemas.doctor import (
     RoomAssignmentCreate,
     RoomAssignmentOut,
 )
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -23,6 +22,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _assert_hospital_access(user: User, hospital_id: int) -> None:
     if user.role == UserRole.admin:
@@ -73,6 +73,7 @@ def _build_doctor_out(doctor: Doctor) -> DoctorOut:
 # GET /hospitals/{hospital_id}/doctors
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{hospital_id}/doctors",
     response_model=list[DoctorOut],
@@ -112,6 +113,7 @@ def list_doctors(
 # ---------------------------------------------------------------------------
 # POST /hospitals/{hospital_id}/doctors
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{hospital_id}/doctors",
@@ -162,6 +164,7 @@ def create_doctor(
 # PATCH /hospitals/{hospital_id}/doctors/{doctor_id}
 # ---------------------------------------------------------------------------
 
+
 @router.patch(
     "/{hospital_id}/doctors/{doctor_id}",
     response_model=DoctorOut,
@@ -208,6 +211,7 @@ def update_doctor(
 # DELETE /hospitals/{hospital_id}/doctors/{doctor_id}
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/{hospital_id}/doctors/{doctor_id}",
     status_code=204,
@@ -243,6 +247,7 @@ def delete_doctor(
 # ---------------------------------------------------------------------------
 # POST /hospitals/{hospital_id}/doctors/{doctor_id}/room
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{hospital_id}/doctors/{doctor_id}/room",
@@ -315,6 +320,7 @@ def assign_room(
 # ---------------------------------------------------------------------------
 # DELETE /hospitals/{hospital_id}/doctors/{doctor_id}/room
 # ---------------------------------------------------------------------------
+
 
 @router.delete(
     "/{hospital_id}/doctors/{doctor_id}/room",

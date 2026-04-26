@@ -1,19 +1,20 @@
 ﻿"""Tests for OCR/CSV/JSON ingestion endpoint and parser."""
+
 from __future__ import annotations
 
 import json
-import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
+import pytest
+from app.core.config import settings as _settings
+from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.user import User, UserRole
-from app.core.security import create_access_token, hash_password
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
-from app.core.config import settings as _settings
 TEST_DB_URL = _settings.test_database_url
 _engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
 _TestSession = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
@@ -35,10 +36,12 @@ app.dependency_overrides[get_db] = _override_get_db
 def _wipe():
     db = _TestSession()
     try:
-        db.execute(text(
-            "TRUNCATE TABLE doctor_room_assignments, doctors, availability_logs, "
-            "hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
-        ))
+        db.execute(
+            text(
+                "TRUNCATE TABLE doctor_room_assignments, doctors, availability_logs, "
+                "hospital_specialties, users, hospitals RESTART IDENTITY CASCADE"
+            )
+        )
         db.commit()
     finally:
         db.close()
@@ -65,7 +68,9 @@ def admin_user(db):
 
 @pytest.fixture()
 def staff_user(db):
-    u = User(email="staff@sys.com", password_hash=hash_password("pass"), role=UserRole.hospital_staff)
+    u = User(
+        email="staff@sys.com", password_hash=hash_password("pass"), role=UserRole.hospital_staff
+    )
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -80,8 +85,10 @@ def _tok(user):
 # Parser unit tests
 # ---------------------------------------------------------------------------
 
+
 def test_parse_csv_bytes():
     from app.services.ocr.parser import parse_csv
+
     csv_content = b"""name,city,state,country,latitude,longitude,specialties,beds_total,beds_occupied,icu_available,ventilators_available,surge_status,occupancy_rate
 Test Hospital,Mumbai,Maharashtra,India,19.076,72.877,"Cardiology, Emergency",100,60,True,True,normal,60.0
 """
@@ -100,6 +107,7 @@ Test Hospital,Mumbai,Maharashtra,India,19.076,72.877,"Cardiology, Emergency",100
 
 def test_parse_json_bytes():
     from app.services.ocr.parser import parse_json
+
     data = [
         {
             "name": "JSON Hospital",
@@ -128,6 +136,7 @@ def test_parse_json_bytes():
 
 def test_parse_text_to_hospital():
     from app.services.ocr.parser import text_to_hospital
+
     text = """
     City General Hospital
     Address: 123 Main Road, Mumbai
@@ -151,12 +160,14 @@ def test_parse_text_to_hospital():
 
 def test_parse_empty_returns_none():
     from app.services.ocr.parser import text_to_hospital
+
     result = text_to_hospital("")
     assert result is None
 
 
 def test_parse_csv_skips_missing_name():
     from app.services.ocr.parser import parse_csv
+
     csv_content = b"name,latitude,longitude\n,19.0,72.0\nReal Hospital,19.1,72.1\n"
     results = parse_csv(csv_content)
     assert len(results) == 1
@@ -166,6 +177,7 @@ def test_parse_csv_skips_missing_name():
 # ---------------------------------------------------------------------------
 # Ingest API endpoint tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_ingest_requires_admin(staff_user):
@@ -236,11 +248,22 @@ async def test_ingest_json_confirm(admin_user, db):
     from app.models.hospital import Hospital
     from sqlalchemy import select
 
-    data = [{"name": "JSON Ingest Hospital", "lat": 28.6, "lng": 77.2,
-             "address": "Delhi", "specialties": "neurology",
-             "icu_total": 5, "icu_available": 2, "general_total": 30,
-             "general_available": 15, "ventilators_available": 2,
-             "status": "normal", "is_24x7": True}]
+    data = [
+        {
+            "name": "JSON Ingest Hospital",
+            "lat": 28.6,
+            "lng": 77.2,
+            "address": "Delhi",
+            "specialties": "neurology",
+            "icu_total": 5,
+            "icu_available": 2,
+            "general_total": 30,
+            "general_available": 15,
+            "ventilators_available": 2,
+            "status": "normal",
+            "is_24x7": True,
+        }
+    ]
     json_data = json.dumps(data).encode()
 
     transport = ASGITransport(app=app)
@@ -289,4 +312,3 @@ async def test_ingest_empty_file_returns_400(admin_user):
             headers={"Authorization": f"Bearer {_tok(admin_user)}"},
         )
     assert res.status_code == 400
-

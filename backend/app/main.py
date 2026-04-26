@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.security import HTTPBearer
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -18,6 +17,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.services.realtime.ws_manager import redis_subscriber
+
     task = asyncio.create_task(redis_subscriber(settings.redis_url))
     logger.info("Redis availability subscriber started")
 
@@ -25,8 +25,10 @@ async def lifespan(app: FastAPI):
     async def _build_index():
         try:
             import asyncio as _asyncio
+
             loop = _asyncio.get_event_loop()
             from app.services.vector.embeddings import index_all_hospitals
+
             count = await loop.run_in_executor(None, index_all_hospitals)
             logger.info("Chroma index built: %d hospitals", count)
         except Exception as exc:
@@ -86,11 +88,20 @@ This system provides decision-support only. It does not diagnose medical conditi
             {"name": "health", "description": "Service liveness check — DB + Redis status"},
             {"name": "auth", "description": "Register, login, get current user"},
             {"name": "contact", "description": "Public contact form — no auth required"},
-            {"name": "patient", "description": "Symptom triage and hospital recommendations — public"},
+            {
+                "name": "patient",
+                "description": "Symptom triage and hospital recommendations — public",
+            },
             {"name": "hospitals", "description": "Hospital directory — public read access"},
             {"name": "doctors", "description": "Doctor CRUD and room assignments — requires JWT"},
-            {"name": "admin", "description": "Hospital CRUD, user management, audit logs, metrics — requires JWT"},
-            {"name": "ingest", "description": "File ingestion (CSV/JSON/Excel/PDF/Image) with OCR — admin only"},
+            {
+                "name": "admin",
+                "description": "Hospital CRUD, user management, audit logs, metrics — requires JWT",
+            },
+            {
+                "name": "ingest",
+                "description": "File ingestion (CSV/JSON/Excel/PDF/Image) with OCR — admin only",
+            },
             {"name": "realtime", "description": "WebSocket channel for live availability events"},
         ],
     )
@@ -135,4 +146,3 @@ This system provides decision-support only. It does not diagnose medical conditi
 
 
 app = create_app()
-

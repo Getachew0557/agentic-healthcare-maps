@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+from app.core.config import settings
+from app.db.session import get_db
+from app.models.user import User, UserRole
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-
-from app.core.config import settings
-from app.db.session import get_db
-from app.models.user import User, UserRole
 
 security = HTTPBearer(auto_error=False)
 
@@ -42,4 +41,3 @@ def require_role(*roles: UserRole):
         return user
 
     return _dep
-

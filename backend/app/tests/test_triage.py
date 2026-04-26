@@ -1,5 +1,4 @@
 import pytest
-
 from app.services.triage import triage_with_citations
 
 
@@ -17,4 +16,3 @@ async def test_triage_fallback_chest_pain(monkeypatch):
     assert 0.0 <= res.confidence <= 1.0
     assert isinstance(res.rationale, str) and len(res.rationale) > 0
     assert res.citations == []
-

@@ -8,6 +8,7 @@ Usage (from backend/ directory):
 
 Idempotent: skips rows whose hospital_id (external) already exists in the DB.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,11 +19,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select
-
 from app.db.session import SessionLocal
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.specialty import HospitalSpecialty
+from sqlalchemy import select
 
 # ---------------------------------------------------------------------------
 # Field mapping helpers
@@ -109,6 +109,7 @@ def _build_address(row: dict) -> str:
 # Main import function
 # ---------------------------------------------------------------------------
 
+
 def import_csv(csv_path: str, clear: bool = False) -> None:
     db = SessionLocal()
     try:
@@ -158,7 +159,7 @@ def import_csv(csv_path: str, clear: bool = False) -> None:
             hospital = Hospital(
                 name=name,
                 address=address,
-                phone=website,   # store website as phone field for now (frontend shows it)
+                phone=website,  # store website as phone field for now (frontend shows it)
                 lat=lat,
                 lng=lng,
                 is_24x7=True,
@@ -186,7 +187,7 @@ def import_csv(csv_path: str, clear: bool = False) -> None:
                 print(f"  {added} hospitals committed...")
 
         db.commit()
-        print(f"\nImport complete:")
+        print("\nImport complete:")
         print(f"  Added  : {added}")
         print(f"  Skipped: {skipped} (already exist)")
         print(f"  Errors : {errors} (missing name or bad coordinates)")
@@ -203,7 +204,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Import hospitals from CSV")
     parser.add_argument(
         "--csv",
-        default=os.path.join(os.path.dirname(__file__), "..", "data", "healthcare_living_map_FINAL.csv"),
+        default=os.path.join(
+            os.path.dirname(__file__), "..", "data", "healthcare_living_map_FINAL.csv"
+        ),
         help="Path to CSV file",
     )
     parser.add_argument(

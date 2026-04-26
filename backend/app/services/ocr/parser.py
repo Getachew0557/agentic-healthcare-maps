@@ -20,10 +20,8 @@ import io
 import json
 import logging
 import re
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +29,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Output schema
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ParsedHospital:
@@ -47,8 +46,8 @@ class ParsedHospital:
     ventilators_available: int = 0
     status: str = "normal"
     is_24x7: bool = True
-    source: str = "ocr"   # "ocr" | "csv" | "json" | "excel"
-    raw_text: str = ""     # original extracted text for audit
+    source: str = "ocr"  # "ocr" | "csv" | "json" | "excel"
+    raw_text: str = ""  # original extracted text for audit
 
 
 # ---------------------------------------------------------------------------
@@ -56,11 +55,29 @@ class ParsedHospital:
 # ---------------------------------------------------------------------------
 
 _SPECIALTY_KEYWORDS = [
-    "cardiology", "neurology", "oncology", "orthopedics", "pediatrics",
-    "emergency", "general medicine", "gynecology", "radiology", "surgery",
-    "psychiatry", "dermatology", "ophthalmology", "urology", "nephrology",
-    "gastroenterology", "pulmonology", "endocrinology", "hematology",
-    "internal medicine", "obstetrics", "anesthesiology", "trauma",
+    "cardiology",
+    "neurology",
+    "oncology",
+    "orthopedics",
+    "pediatrics",
+    "emergency",
+    "general medicine",
+    "gynecology",
+    "radiology",
+    "surgery",
+    "psychiatry",
+    "dermatology",
+    "ophthalmology",
+    "urology",
+    "nephrology",
+    "gastroenterology",
+    "pulmonology",
+    "endocrinology",
+    "hematology",
+    "internal medicine",
+    "obstetrics",
+    "anesthesiology",
+    "trauma",
 ]
 
 
@@ -133,7 +150,9 @@ def text_to_hospital(text: str, source: str = "ocr") -> ParsedHospital | None:
     icu_total = _extract_number(text, r"icu\s+(?:total|beds?)\s*[:\-]?\s*(\d+)") or 0
     icu_available = _extract_number(text, r"icu\s+available\s*[:\-]?\s*(\d+)") or 0
     general_total = _extract_number(text, r"(?:general|total)\s+beds?\s*[:\-]?\s*(\d+)") or 0
-    general_available = _extract_number(text, r"(?:general|available)\s+beds?\s*[:\-]?\s*(\d+)") or 0
+    general_available = (
+        _extract_number(text, r"(?:general|available)\s+beds?\s*[:\-]?\s*(\d+)") or 0
+    )
     ventilators = _extract_number(text, r"ventilators?\s*[:\-]?\s*(\d+)") or 0
 
     # 24x7
@@ -162,6 +181,7 @@ def text_to_hospital(text: str, source: str = "ocr") -> ParsedHospital | None:
 # ---------------------------------------------------------------------------
 # CSV parser
 # ---------------------------------------------------------------------------
+
 
 def parse_csv(content: bytes) -> list[ParsedHospital]:
     """Parse CSV bytes into ParsedHospital list."""
@@ -194,8 +214,11 @@ def parse_csv(content: bytes) -> list[ParsedHospital]:
             has_vents = str(row.get("ventilators_available", "")).lower() in ("true", "1", "yes")
 
             import math
+
             icu_total = max(5, math.floor(beds_total * 0.10)) if has_icu else 0
-            icu_available = max(0, math.floor(icu_total * (1.0 - occupancy / 100.0))) if has_icu else 0
+            icu_available = (
+                max(0, math.floor(icu_total * (1.0 - occupancy / 100.0))) if has_icu else 0
+            )
             general_available = max(0, beds_total - beds_occupied)
 
             # Surge status mapping
@@ -205,9 +228,7 @@ def parse_csv(content: bytes) -> list[ParsedHospital]:
 
             raw_specialties = row.get("specialties") or row.get("specialty") or ""
             specialties = [
-                s.strip().lower().replace(" ", "_")
-                for s in raw_specialties.split(",")
-                if s.strip()
+                s.strip().lower().replace(" ", "_") for s in raw_specialties.split(",") if s.strip()
             ]
 
             city = row.get("city", "")
@@ -216,23 +237,25 @@ def parse_csv(content: bytes) -> list[ParsedHospital]:
             address_parts = [p for p in [city, state, country] if p]
             address = ", ".join(address_parts)
 
-            results.append(ParsedHospital(
-                name=name,
-                address=address,
-                lat=lat,
-                lng=lng,
-                phone=row.get("hospital_website_url") or row.get("phone") or None,
-                specialties=specialties,
-                icu_total=icu_total,
-                icu_available=icu_available,
-                general_total=beds_total,
-                general_available=general_available,
-                ventilators_available=10 if has_vents else 0,
-                status=status,
-                is_24x7=True,
-                source="csv",
-                raw_text=str(row)[:500],
-            ))
+            results.append(
+                ParsedHospital(
+                    name=name,
+                    address=address,
+                    lat=lat,
+                    lng=lng,
+                    phone=row.get("hospital_website_url") or row.get("phone") or None,
+                    specialties=specialties,
+                    icu_total=icu_total,
+                    icu_available=icu_available,
+                    general_total=beds_total,
+                    general_available=general_available,
+                    ventilators_available=10 if has_vents else 0,
+                    status=status,
+                    is_24x7=True,
+                    source="csv",
+                    raw_text=str(row)[:500],
+                )
+            )
     except Exception as exc:
         logger.warning("CSV parse error: %s", exc)
 
@@ -242,6 +265,7 @@ def parse_csv(content: bytes) -> list[ParsedHospital]:
 # ---------------------------------------------------------------------------
 # JSON parser
 # ---------------------------------------------------------------------------
+
 
 def parse_json(content: bytes) -> list[ParsedHospital]:
     """Parse JSON bytes (list of hospital dicts) into ParsedHospital list."""
@@ -260,27 +284,29 @@ def parse_json(content: bytes) -> list[ParsedHospital]:
             if not name:
                 continue
 
-            results.append(ParsedHospital(
-                name=name,
-                address=item.get("address") or item.get("location") or "",
-                lat=item.get("lat") or item.get("latitude"),
-                lng=item.get("lng") or item.get("longitude"),
-                phone=item.get("phone") or item.get("contact"),
-                specialties=[
-                    s.strip().lower().replace(" ", "_")
-                    for s in str(item.get("specialties") or "").split(",")
-                    if s.strip()
-                ],
-                icu_total=int(item.get("icu_total") or 0),
-                icu_available=int(item.get("icu_available") or 0),
-                general_total=int(item.get("general_total") or item.get("beds_total") or 0),
-                general_available=int(item.get("general_available") or 0),
-                ventilators_available=int(item.get("ventilators_available") or 0),
-                status=item.get("status") or "normal",
-                is_24x7=bool(item.get("is_24x7", True)),
-                source="json",
-                raw_text=str(item)[:500],
-            ))
+            results.append(
+                ParsedHospital(
+                    name=name,
+                    address=item.get("address") or item.get("location") or "",
+                    lat=item.get("lat") or item.get("latitude"),
+                    lng=item.get("lng") or item.get("longitude"),
+                    phone=item.get("phone") or item.get("contact"),
+                    specialties=[
+                        s.strip().lower().replace(" ", "_")
+                        for s in str(item.get("specialties") or "").split(",")
+                        if s.strip()
+                    ],
+                    icu_total=int(item.get("icu_total") or 0),
+                    icu_available=int(item.get("icu_available") or 0),
+                    general_total=int(item.get("general_total") or item.get("beds_total") or 0),
+                    general_available=int(item.get("general_available") or 0),
+                    ventilators_available=int(item.get("ventilators_available") or 0),
+                    status=item.get("status") or "normal",
+                    is_24x7=bool(item.get("is_24x7", True)),
+                    source="json",
+                    raw_text=str(item)[:500],
+                )
+            )
     except Exception as exc:
         logger.warning("JSON parse error: %s", exc)
 
@@ -291,10 +317,12 @@ def parse_json(content: bytes) -> list[ParsedHospital]:
 # Excel parser
 # ---------------------------------------------------------------------------
 
+
 def parse_excel(content: bytes) -> list[ParsedHospital]:
     """Parse XLSX/XLS bytes using openpyxl/xlrd via pandas."""
     try:
         import pandas as pd
+
         df = pd.read_excel(io.BytesIO(content))
         # Convert to CSV-like dict rows and reuse CSV logic
         csv_buf = io.StringIO()
@@ -312,11 +340,13 @@ def parse_excel(content: bytes) -> list[ParsedHospital]:
 # PDF / Image → OCR → text
 # ---------------------------------------------------------------------------
 
+
 def _ocr_image_bytes(image_bytes: bytes) -> str:
     """Run Tesseract OCR on raw image bytes. Returns extracted text."""
     try:
         import pytesseract
         from PIL import Image
+
         img = Image.open(io.BytesIO(image_bytes))
         return pytesseract.image_to_string(img)
     except Exception as exc:
@@ -329,6 +359,7 @@ def parse_pdf(content: bytes) -> list[ParsedHospital]:
     results = []
     try:
         from pdf2image import convert_from_bytes
+
         pages = convert_from_bytes(content, dpi=200)
         for i, page in enumerate(pages):
             buf = io.BytesIO()
@@ -357,6 +388,7 @@ def parse_image(content: bytes) -> list[ParsedHospital]:
 # ---------------------------------------------------------------------------
 # Main dispatcher
 # ---------------------------------------------------------------------------
+
 
 def parse_file(filename: str, content: bytes) -> list[ParsedHospital]:
     """

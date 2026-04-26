@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-
 from app.core.config import settings
 from app.schemas.patient import Citation
 
@@ -38,4 +37,3 @@ async def tavily_search(*, query: str, max_results: int = 3) -> list[Citation]:
         if title and link:
             citations.append(Citation(title=title, url=link))
     return citations
-

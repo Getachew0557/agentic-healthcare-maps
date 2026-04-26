@@ -28,7 +28,12 @@ class AvailabilityUpdate(BaseModel):
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> "AvailabilityUpdate":
-        fields = (self.icu_available, self.general_available, self.ventilators_available, self.status)
+        fields = (
+            self.icu_available,
+            self.general_available,
+            self.ventilators_available,
+            self.status,
+        )
         if all(f is None for f in fields):
             raise ValueError("At least one field must be provided")
         return self

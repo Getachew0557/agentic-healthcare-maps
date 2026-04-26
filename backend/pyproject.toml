@@ -9,4 +9,4 @@ src = ["app"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
-
+extend-ignore = ["E501", "B008", "E402", "E741", "B007", "B904"]

@@ -6,6 +6,7 @@ Usage (from backend/ directory):
 
 Idempotent: skips if doctors already exist for a hospital.
 """
+
 from __future__ import annotations
 
 import os
@@ -13,17 +14,21 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select
-
 from app.db.session import SessionLocal
 from app.models.doctor import Doctor, DoctorRoomAssignment
 from app.models.hospital import Hospital
+from sqlalchemy import select
 
 DOCTORS_PER_HOSPITAL = [
     {"name": "Dr. Arjun Sharma", "specialty": "cardiology", "phone": None, "room": "Cardio-101"},
     {"name": "Dr. Priya Nair", "specialty": "neurology", "phone": None, "room": "Neuro-205"},
     {"name": "Dr. Rahul Mehta", "specialty": "emergency", "phone": None, "room": "ER-01"},
-    {"name": "Dr. Sunita Patel", "specialty": "pediatrics", "phone": None, "room": None},  # no room — tests anti-hallucination
+    {
+        "name": "Dr. Sunita Patel",
+        "specialty": "pediatrics",
+        "phone": None,
+        "room": None,
+    },  # no room — tests anti-hallucination
     {"name": "Dr. Vikram Singh", "specialty": "orthopedics", "phone": None, "room": "Ortho-312"},
 ]
 
@@ -36,9 +41,7 @@ def seed_doctors() -> None:
         added_rooms = 0
 
         for hospital in hospitals:
-            existing = db.scalar(
-                select(Doctor).where(Doctor.hospital_id == hospital.id)
-            )
+            existing = db.scalar(select(Doctor).where(Doctor.hospital_id == hospital.id))
             if existing:
                 continue
 

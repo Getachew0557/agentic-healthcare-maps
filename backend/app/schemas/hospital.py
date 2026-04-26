@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, field_validator
 
-
 # ---------------------------------------------------------------------------
 # Hospital output schemas
 # ---------------------------------------------------------------------------
+
 
 class SpecialtyOut(BaseModel):
     id: int
@@ -37,6 +37,7 @@ class HospitalOut(BaseModel):
 # Hospital CRUD schemas (admin + hospital_staff self-service)
 # ---------------------------------------------------------------------------
 
+
 class HospitalCreate(BaseModel):
     name: str
     address: str = ""
@@ -63,6 +64,7 @@ class HospitalCreate(BaseModel):
 
 class HospitalUpdate(BaseModel):
     """Hospital staff can update their own hospital's profile info."""
+
     name: str | None = None
     address: str | None = None
     phone: str | None = None
@@ -88,6 +90,7 @@ class HospitalUpdate(BaseModel):
 # Specialty CRUD schemas
 # ---------------------------------------------------------------------------
 
+
 class SpecialtyCreate(BaseModel):
     name: str
 
@@ -96,9 +99,10 @@ class SpecialtyCreate(BaseModel):
 # Recommendation request / response
 # ---------------------------------------------------------------------------
 
+
 class RecommendationRequest(BaseModel):
     specialty: str
-    urgency: str          # "normal" | "urgent" | "emergency"
+    urgency: str  # "normal" | "urgent" | "emergency"
     lat: float
     lng: float
     radius_km: float = 50.0
@@ -125,6 +129,7 @@ class RecommendationResult(BaseModel):
     Anti-hallucination: doctor.room is None if no active room assignment exists.
     claims array declares the source of every factual field.
     """
+
     hospital: HospitalOut
     distance_km: float
     eta_minutes: float | None

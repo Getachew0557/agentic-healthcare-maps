@@ -14,8 +14,9 @@ class Citation(BaseModel):
 
 class Claim(BaseModel):
     """Anti-hallucination contract — every factual field must declare its source."""
+
     field: str
-    source: str   # "db" | "tool" | "fallback" | "unavailable"
+    source: str  # "db" | "tool" | "fallback" | "unavailable"
     value: str
 
 
@@ -25,5 +26,4 @@ class TriageResponse(BaseModel):
     confidence: float
     rationale: str
     citations: list[Citation] = []
-    claims: list[Claim] = []   # anti-hallucination: source of each field
-
+    claims: list[Claim] = []  # anti-hallucination: source of each field

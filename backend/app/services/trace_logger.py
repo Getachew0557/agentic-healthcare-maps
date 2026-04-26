@@ -9,7 +9,6 @@ Usage:
 """
 
 import logging
-import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -33,6 +32,7 @@ def log_trace(
         return
     try:
         from app.models.chat import AgentTrace
+
         trace = AgentTrace(
             tools_called=tools_called,
             retrievals=retrievals or {},

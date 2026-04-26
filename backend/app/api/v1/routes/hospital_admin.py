@@ -15,18 +15,16 @@ Hospital staff (own hospital only):
   PATCH  /admin/hospitals/me           — update own hospital profile
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
+from app.api.v1.routes.hospitals import _build_hospital_out
 from app.core.auth import get_current_user, require_role
 from app.db.session import get_db
-from app.models.doctor import Doctor, DoctorRoomAssignment
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.specialty import HospitalSpecialty
 from app.models.user import User, UserRole
 from app.schemas.hospital import HospitalCreate, HospitalOut, HospitalUpdate
-from app.api.v1.routes.hospitals import _build_hospital_out
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -34,6 +32,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # GET /admin/hospitals/me  — hospital staff: get own hospital
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/hospitals/me",
@@ -46,7 +45,10 @@ def get_my_hospital(
     user: User = Depends(get_current_user),
 ) -> HospitalOut:
     if user.role == UserRole.admin:
-        raise HTTPException(status_code=400, detail="Admins are not linked to a specific hospital. Use /admin/hospitals/{id}.")
+        raise HTTPException(
+            status_code=400,
+            detail="Admins are not linked to a specific hospital. Use /admin/hospitals/{id}.",
+        )
     if not user.hospital_id:
         raise HTTPException(status_code=404, detail="No hospital linked to your account")
     hospital = db.get(Hospital, user.hospital_id)
@@ -58,6 +60,7 @@ def get_my_hospital(
 # ---------------------------------------------------------------------------
 # PATCH /admin/hospitals/me  — hospital staff: update own hospital
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/hospitals/me",
@@ -93,6 +96,7 @@ def update_my_hospital(
 # GET /admin/hospitals  — list all (admin only)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/hospitals",
     response_model=list[HospitalOut],
@@ -120,6 +124,7 @@ def admin_list_hospitals(
 # ---------------------------------------------------------------------------
 # POST /admin/hospitals  — create (admin only)
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/hospitals",
@@ -173,13 +178,21 @@ def admin_create_hospital(
     # Index in Chroma
     try:
         from app.services.vector.embeddings import index_hospital
+
         parts = [p.strip() for p in hospital.address.split(",")]
         index_hospital(
-            hospital_id=hospital.id, name=hospital.name, address=hospital.address,
-            specialties=list(seen), status=hospital.status.value,
-            icu_available=hospital.icu_available, general_available=hospital.general_available,
-            ventilators_available=hospital.ventilators_available, is_24x7=hospital.is_24x7,
-            phone=hospital.phone, city=parts[0] if parts else "", country=parts[-1] if len(parts) > 1 else "",
+            hospital_id=hospital.id,
+            name=hospital.name,
+            address=hospital.address,
+            specialties=list(seen),
+            status=hospital.status.value,
+            icu_available=hospital.icu_available,
+            general_available=hospital.general_available,
+            ventilators_available=hospital.ventilators_available,
+            is_24x7=hospital.is_24x7,
+            phone=hospital.phone,
+            city=parts[0] if parts else "",
+            country=parts[-1] if len(parts) > 1 else "",
         )
     except Exception:
         pass
@@ -190,6 +203,7 @@ def admin_create_hospital(
 # ---------------------------------------------------------------------------
 # GET /admin/hospitals/{id}  — get one (admin only)
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/hospitals/{hospital_id}",
@@ -211,6 +225,7 @@ def admin_get_hospital(
 # ---------------------------------------------------------------------------
 # PATCH /admin/hospitals/{id}  — update any (admin only)
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/hospitals/{hospital_id}",
@@ -239,6 +254,7 @@ def admin_update_hospital(
 # DELETE /admin/hospitals/{id}  — delete (admin only)
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/hospitals/{hospital_id}",
     status_code=204,
@@ -259,6 +275,7 @@ def admin_delete_hospital(
     # Remove from Chroma
     try:
         from app.services.vector.embeddings import _get_collection
+
         _get_collection().delete(ids=[str(hospital_id)])
     except Exception:
         pass
@@ -267,6 +284,7 @@ def admin_delete_hospital(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _apply_hospital_update(hospital: Hospital, payload: HospitalUpdate) -> None:
     if payload.name is not None:
@@ -297,18 +315,30 @@ def _apply_hospital_update(hospital: Hospital, payload: HospitalUpdate) -> None:
 
 def _reindex(hospital: Hospital, db: Session) -> None:
     try:
-        from sqlalchemy import select as sa_select
         from app.services.vector.embeddings import index_hospital
-        specs = list(db.scalars(
-            sa_select(HospitalSpecialty.name).where(HospitalSpecialty.hospital_id == hospital.id)
-        ).all())
+        from sqlalchemy import select as sa_select
+
+        specs = list(
+            db.scalars(
+                sa_select(HospitalSpecialty.name).where(
+                    HospitalSpecialty.hospital_id == hospital.id
+                )
+            ).all()
+        )
         parts = [p.strip() for p in hospital.address.split(",")]
         index_hospital(
-            hospital_id=hospital.id, name=hospital.name, address=hospital.address,
-            specialties=specs, status=hospital.status.value,
-            icu_available=hospital.icu_available, general_available=hospital.general_available,
-            ventilators_available=hospital.ventilators_available, is_24x7=hospital.is_24x7,
-            phone=hospital.phone, city=parts[0] if parts else "", country=parts[-1] if len(parts) > 1 else "",
+            hospital_id=hospital.id,
+            name=hospital.name,
+            address=hospital.address,
+            specialties=specs,
+            status=hospital.status.value,
+            icu_available=hospital.icu_available,
+            general_available=hospital.general_available,
+            ventilators_available=hospital.ventilators_available,
+            is_24x7=hospital.is_24x7,
+            phone=hospital.phone,
+            city=parts[0] if parts else "",
+            country=parts[-1] if len(parts) > 1 else "",
         )
     except Exception:
         pass

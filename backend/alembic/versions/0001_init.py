@@ -41,7 +41,12 @@ def upgrade() -> None:
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
         sa.Column("role", sa.String(length=32), nullable=False, server_default="hospital_staff"),
-        sa.Column("hospital_id", sa.Integer(), sa.ForeignKey("hospitals.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "hospital_id",
+            sa.Integer(),
+            sa.ForeignKey("hospitals.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     op.create_index("ix_users_email", "users", ["email"], unique=True)
     op.create_index("ix_users_hospital_id", "users", ["hospital_id"])
@@ -50,7 +55,10 @@ def upgrade() -> None:
         "hospital_specialties",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column(
-            "hospital_id", sa.Integer(), sa.ForeignKey("hospitals.id", ondelete="CASCADE"), nullable=False
+            "hospital_id",
+            sa.Integer(),
+            sa.ForeignKey("hospitals.id", ondelete="CASCADE"),
+            nullable=False,
         ),
         sa.Column("name", sa.String(length=100), nullable=False),
         sa.UniqueConstraint("hospital_id", "name", name="uq_hospital_specialty"),
@@ -62,18 +70,28 @@ def upgrade() -> None:
         "availability_logs",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column(
-            "hospital_id", sa.Integer(), sa.ForeignKey("hospitals.id", ondelete="CASCADE"), nullable=False
+            "hospital_id",
+            sa.Integer(),
+            sa.ForeignKey("hospitals.id", ondelete="CASCADE"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_by_user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+            "updated_by_user_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
         ),
         sa.Column("field_name", sa.String(length=64), nullable=False),
         sa.Column("old_value", sa.String(length=64), nullable=False),
         sa.Column("new_value", sa.String(length=64), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_availability_logs_hospital_id", "availability_logs", ["hospital_id"])
-    op.create_index("ix_availability_logs_updated_by_user_id", "availability_logs", ["updated_by_user_id"])
+    op.create_index(
+        "ix_availability_logs_updated_by_user_id", "availability_logs", ["updated_by_user_id"]
+    )
 
 
 def downgrade() -> None:
@@ -91,4 +109,3 @@ def downgrade() -> None:
 
     op.drop_index("ix_hospitals_name", table_name="hospitals")
     op.drop_table("hospitals")
-

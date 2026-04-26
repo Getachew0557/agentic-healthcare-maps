@@ -34,6 +34,7 @@ def _get_model():
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer
+
         logger.info("Loading embedding model %s ...", EMBEDDING_MODEL)
         _model = SentenceTransformer(EMBEDDING_MODEL)
         logger.info("Embedding model loaded.")
@@ -44,6 +45,7 @@ def _get_collection():
     global _chroma_client, _collection
     if _collection is None:
         import chromadb
+
         _chroma_client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
         _collection = _chroma_client.get_or_create_collection(
             name=COLLECTION_NAME,
@@ -120,16 +122,18 @@ def index_hospital(
             ids=[str(hospital_id)],
             embeddings=[embedding],
             documents=[doc],
-            metadatas=[{
-                "hospital_id": hospital_id,
-                "name": name,
-                "city": city,
-                "country": country,
-                "specialties": ",".join(specialties),
-                "status": status,
-                "icu_available": icu_available,
-                "general_available": general_available,
-            }],
+            metadatas=[
+                {
+                    "hospital_id": hospital_id,
+                    "name": name,
+                    "city": city,
+                    "country": country,
+                    "specialties": ",".join(specialties),
+                    "status": status,
+                    "icu_available": icu_available,
+                    "general_available": general_available,
+                }
+            ],
         )
     except Exception as exc:
         logger.warning("Failed to index hospital %d: %s", hospital_id, exc)
@@ -140,19 +144,21 @@ def index_all_hospitals() -> int:
     Load all hospitals from PostgreSQL and index into Chroma.
     Returns count of hospitals indexed.
     """
-    from sqlalchemy import select
     from app.db.session import SessionLocal
     from app.models.hospital import Hospital
     from app.models.specialty import HospitalSpecialty
+    from sqlalchemy import select
 
     db = SessionLocal()
     try:
         hospitals = db.scalars(select(Hospital)).all()
         count = 0
         for h in hospitals:
-            specs = list(db.scalars(
-                select(HospitalSpecialty.name).where(HospitalSpecialty.hospital_id == h.id)
-            ).all())
+            specs = list(
+                db.scalars(
+                    select(HospitalSpecialty.name).where(HospitalSpecialty.hospital_id == h.id)
+                ).all()
+            )
             parts = [p.strip() for p in h.address.split(",")]
             city = parts[0] if parts else ""
             country = parts[-1] if len(parts) > 1 else ""
@@ -211,7 +217,7 @@ def rerank_by_similarity(
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=n,
-            ids=str_ids,          # filter to candidate set only
+            ids=str_ids,  # filter to candidate set only
             include=["metadatas", "distances"],
         )
 

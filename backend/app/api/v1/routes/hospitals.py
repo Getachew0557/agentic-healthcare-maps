@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.hospital import Hospital
 from app.models.specialty import HospitalSpecialty
 from app.models.user import UserRole
 from app.schemas.hospital import HospitalOut, SpecialtyCreate, SpecialtyOut
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -19,6 +18,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Internal helper — reused by patient.py and admin.py
 # ---------------------------------------------------------------------------
+
 
 def _build_hospital_out(hospital: Hospital, db: Session) -> HospitalOut:
     specialties = db.scalars(
@@ -55,6 +55,7 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 # GET /hospitals
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "",
     response_model=list[HospitalOut],
@@ -79,12 +80,17 @@ Returns hospitals with optional filters.
         200: {
             "content": {
                 "application/json": {
-                    "example": [{
-                        "id": 1, "name": "Lilavati Hospital",
-                        "lat": 19.0596, "lng": 72.8295,
-                        "status": "normal", "icu_available": 12,
-                        "specialties": ["cardiology", "emergency"]
-                    }]
+                    "example": [
+                        {
+                            "id": 1,
+                            "name": "Lilavati Hospital",
+                            "lat": 19.0596,
+                            "lng": 72.8295,
+                            "status": "normal",
+                            "icu_available": 12,
+                            "specialties": ["cardiology", "emergency"],
+                        }
+                    ]
                 }
             }
         }
@@ -92,7 +98,9 @@ Returns hospitals with optional filters.
 )
 def list_hospitals(
     specialty: str | None = Query(None, description="Filter by specialty (partial match)"),
-    status: str | None = Query(None, description="Filter by status: normal | busy | emergency_only"),
+    status: str | None = Query(
+        None, description="Filter by status: normal | busy | emergency_only"
+    ),
     lat: float | None = Query(None, description="Patient latitude for geo filter"),
     lng: float | None = Query(None, description="Patient longitude for geo filter"),
     radius_km: float = Query(50.0, description="Radius in km for geo filter (requires lat+lng)"),
@@ -115,10 +123,7 @@ def list_hospitals(
 
     # Apply geo filter in Python (no PostGIS required for MVP scale)
     if lat is not None and lng is not None:
-        hospitals = [
-            h for h in hospitals
-            if _haversine_km(lat, lng, h.lat, h.lng) <= radius_km
-        ]
+        hospitals = [h for h in hospitals if _haversine_km(lat, lng, h.lat, h.lng) <= radius_km]
 
     return [_build_hospital_out(h, db) for h in hospitals]
 
@@ -127,13 +132,25 @@ def list_hospitals(
 # GET /hospitals/{hospital_id}
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{hospital_id}",
     response_model=HospitalOut,
     summary="Get a single hospital by ID",
     description="Returns full details for one hospital including current bed counts and specialties.",
     responses={
-        200: {"content": {"application/json": {"example": {"id": 1, "name": "Lilavati Hospital", "status": "normal", "icu_available": 12}}}},
+        200: {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "name": "Lilavati Hospital",
+                        "status": "normal",
+                        "icu_available": 12,
+                    }
+                }
+            }
+        },
         404: {"description": "Hospital not found"},
     },
 )
@@ -148,13 +165,20 @@ def get_hospital(hospital_id: int, db: Session = Depends(get_db)):
 # GET /hospitals/{hospital_id}/specialties
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{hospital_id}/specialties",
     response_model=list[SpecialtyOut],
     summary="List specialties for a hospital",
     description="Returns all medical specialties offered by a hospital.",
     responses={
-        200: {"content": {"application/json": {"example": [{"id": 1, "name": "cardiology"}, {"id": 2, "name": "emergency"}]}}},
+        200: {
+            "content": {
+                "application/json": {
+                    "example": [{"id": 1, "name": "cardiology"}, {"id": 2, "name": "emergency"}]
+                }
+            }
+        },
         404: {"description": "Hospital not found"},
     },
 )
@@ -172,6 +196,7 @@ def list_specialties(hospital_id: int, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # POST /hospitals/{hospital_id}/specialties
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{hospital_id}/specialties",
@@ -199,6 +224,7 @@ def add_specialty(
     user=Depends(require_role(UserRole.admin, UserRole.hospital_staff)),
 ):
     from app.api.v1.routes.admin import _assert_hospital_access
+
     _assert_hospital_access(user, hospital_id)
 
     hospital = db.get(Hospital, hospital_id)
@@ -228,6 +254,7 @@ def add_specialty(
 # DELETE /hospitals/{hospital_id}/specialties/{specialty_id}
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/{hospital_id}/specialties/{specialty_id}",
     status_code=204,
@@ -251,6 +278,7 @@ def delete_specialty(
     user=Depends(require_role(UserRole.admin, UserRole.hospital_staff)),
 ):
     from app.api.v1.routes.admin import _assert_hospital_access
+
     _assert_hospital_access(user, hospital_id)
 
     spec = db.scalar(

@@ -11,6 +11,7 @@ Run this:
 
 The index is persisted to CHROMA_PERSIST_DIR (default: ./chroma_data).
 """
+
 from __future__ import annotations
 
 import os
@@ -25,7 +26,7 @@ def main() -> None:
     print("Loading sentence-transformers model (first run downloads ~90MB)...")
 
     start = time.time()
-    from app.services.vector.embeddings import index_all_hospitals, get_index_stats
+    from app.services.vector.embeddings import get_index_stats, index_all_hospitals
 
     count = index_all_hospitals()
     elapsed = time.time() - start

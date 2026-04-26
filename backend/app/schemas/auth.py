@@ -38,6 +38,7 @@ class UserOut(BaseModel):
 
 class UserUpdate(BaseModel):
     """Admin can update any user's role or hospital assignment."""
+
     role: str | None = None
     hospital_id: int | None = None
 
@@ -52,4 +53,3 @@ class ContactRequest(BaseModel):
 class ContactResponse(BaseModel):
     status: str
     message: str
-

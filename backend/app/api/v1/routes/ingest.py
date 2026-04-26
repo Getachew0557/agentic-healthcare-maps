@@ -14,17 +14,16 @@ This is the "messy data superpower" demo feature.
 
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.hospital import Hospital, HospitalStatus
 from app.models.specialty import HospitalSpecialty
 from app.models.user import User, UserRole
 from app.services.ocr.parser import ParsedHospital, parse_file
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +35,7 @@ _MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 # ---------------------------------------------------------------------------
 # Response schemas
 # ---------------------------------------------------------------------------
+
 
 class ParsedHospitalPreview(BaseModel):
     name: str
@@ -66,6 +66,7 @@ class IngestResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # POST /admin/ingest
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/ingest",
@@ -121,7 +122,7 @@ async def ingest_file(
         raise HTTPException(
             status_code=400,
             detail=f"No hospital records could be extracted from '{filename}'. "
-                   f"Check the file format and content.",
+            f"Check the file format and content.",
         )
 
     preview = [
@@ -213,15 +214,18 @@ async def ingest_file(
     # --- Re-index new hospitals in Chroma (best-effort) ---
     try:
         from app.services.vector.embeddings import index_hospital
+
         # Re-query the just-inserted hospitals to get their IDs
         for h in parsed:
             hospital_row = db.scalar(select(Hospital).where(Hospital.name == h.name))
             if hospital_row:
-                specs = list(db.scalars(
-                    select(HospitalSpecialty.name).where(
-                        HospitalSpecialty.hospital_id == hospital_row.id
-                    )
-                ).all())
+                specs = list(
+                    db.scalars(
+                        select(HospitalSpecialty.name).where(
+                            HospitalSpecialty.hospital_id == hospital_row.id
+                        )
+                    ).all()
+                )
                 parts = [p.strip() for p in hospital_row.address.split(",")]
                 index_hospital(
                     hospital_id=hospital_row.id,

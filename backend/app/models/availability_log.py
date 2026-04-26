@@ -12,12 +12,15 @@ class AvailabilityLog(Base):
     __tablename__ = "availability_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    hospital_id: Mapped[int] = mapped_column(ForeignKey("hospitals.id", ondelete="CASCADE"), index=True)
-    updated_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    hospital_id: Mapped[int] = mapped_column(
+        ForeignKey("hospitals.id", ondelete="CASCADE"), index=True
+    )
+    updated_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
 
     field_name: Mapped[str] = mapped_column(String(64))
     old_value: Mapped[str] = mapped_column(String(64))
     new_value: Mapped[str] = mapped_column(String(64))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-

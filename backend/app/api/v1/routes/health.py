@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from app.db.session import get_db
 from fastapi import APIRouter
 from sqlalchemy import text
-
-from app.db.session import get_db
 
 router = APIRouter()
 
@@ -31,7 +30,11 @@ Use this endpoint for load-balancer liveness and readiness probes.
                         },
                         "redis_down": {
                             "summary": "Redis unavailable (non-fatal)",
-                            "value": {"status": "degraded", "database": "ok", "redis": "unavailable"},
+                            "value": {
+                                "status": "degraded",
+                                "database": "ok",
+                                "redis": "unavailable",
+                            },
                         },
                         "db_down": {
                             "summary": "Database error",
@@ -61,8 +64,8 @@ def health():
 
     # --- Redis check (non-fatal) ---
     try:
-        from app.core.config import settings
         import redis as redis_lib
+        from app.core.config import settings
 
         r = redis_lib.from_url(settings.redis_url, socket_connect_timeout=2)
         r.ping()

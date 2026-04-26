@@ -18,7 +18,6 @@ import math
 from dataclasses import dataclass
 
 import httpx
-
 from app.core.config import settings
 from app.schemas.hospital import HospitalOut, HospitalRecommendation, ScoreBreakdown
 
@@ -76,6 +75,7 @@ def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 # OpenRouteService ETA (optional — graceful fallback)
 # ---------------------------------------------------------------------------
 
+
 async def _ors_eta_minutes(
     origin_lat: float,
     origin_lng: float,
@@ -105,9 +105,7 @@ async def _ors_eta_minutes(
             res = await client.post(url, json=body, headers=headers)
             res.raise_for_status()
             data = res.json()
-        duration_seconds = (
-            data["routes"][0]["summary"]["duration"]
-        )
+        duration_seconds = data["routes"][0]["summary"]["duration"]
         return round(duration_seconds / 60, 1)
     except Exception:
         return None
@@ -116,6 +114,7 @@ async def _ors_eta_minutes(
 # ---------------------------------------------------------------------------
 # Individual score components
 # ---------------------------------------------------------------------------
+
 
 def _travel_score(distance_km: float) -> float:
     """
@@ -167,6 +166,7 @@ def _ventilator_score(ventilators_available: int, specialty: str) -> float:
 # Public ranking function
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _Candidate:
     hospital: HospitalOut
@@ -205,12 +205,7 @@ async def rank_hospitals(
         bs = _bed_score(h.icu_available, h.general_available)
         vs = _ventilator_score(h.ventilators_available, specialty)
 
-        total = (
-            w["travel"] * ts
-            + w["specialty"] * ss
-            + w["bed"] * bs
-            + w["ventilator"] * vs
-        )
+        total = w["travel"] * ts + w["specialty"] * ss + w["bed"] * bs + w["ventilator"] * vs
 
         breakdown = ScoreBreakdown(
             travel_score=round(ts, 4),
@@ -219,7 +214,11 @@ async def rank_hospitals(
             ventilator_score=round(vs, 4),
             total=round(total, 4),
         )
-        candidates.append(_Candidate(hospital=h, distance_km=round(dist, 2), eta_minutes=None, breakdown=breakdown))
+        candidates.append(
+            _Candidate(
+                hospital=h, distance_km=round(dist, 2), eta_minutes=None, breakdown=breakdown
+            )
+        )
 
     # --- Step 2: sort by score ---
     candidates.sort(key=lambda c: c.breakdown.total, reverse=True)

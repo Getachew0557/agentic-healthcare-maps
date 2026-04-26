@@ -3,18 +3,19 @@ Live chat test — exercises the full triage + recommendations pipeline.
 Run from backend/ directory with:
     python app/tests/test_chat_live.py
 """
+
 from __future__ import annotations
 
 import asyncio
-import json
-import sys
 import os
+import sys
 
 # backend/ is two levels up from app/tests/
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import httpx
 import os
+
+import httpx
 
 BASE = os.environ.get("API_BASE_URL", "http://localhost:8000/api/v1")
 

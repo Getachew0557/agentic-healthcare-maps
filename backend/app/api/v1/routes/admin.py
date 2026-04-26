@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-
+from app.api.v1.routes.hospitals import _build_hospital_out
 from app.core.auth import get_current_user, require_role
 from app.core.config import settings
 from app.db.session import get_db
@@ -14,8 +11,10 @@ from app.models.user import User, UserRole
 from app.schemas.admin import AvailabilityLogOut, AvailabilityUpdate
 from app.schemas.chat import AgentTraceOut, ChatMessageOut, ChatSessionOut
 from app.schemas.hospital import HospitalOut
-from app.api.v1.routes.hospitals import _build_hospital_out
 from app.services.realtime.ws_manager import broadcast_availability_update
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -35,6 +34,7 @@ def _assert_hospital_access(user: User, hospital_id: int) -> None:
 # ---------------------------------------------------------------------------
 # PATCH /admin/hospitals/{hospital_id}/availability
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/hospitals/{hospital_id}/availability",
@@ -76,24 +76,28 @@ async def update_availability(
                     detail=f"{field} ({new_val}) cannot exceed {total_field} ({total})",
                 )
         setattr(hospital, field, new_val)
-        logs.append(AvailabilityLog(
-            hospital_id=hospital_id,
-            updated_by_user_id=user.id,
-            field_name=field,
-            old_value=str(old_val),
-            new_value=str(new_val),
-        ))
+        logs.append(
+            AvailabilityLog(
+                hospital_id=hospital_id,
+                updated_by_user_id=user.id,
+                field_name=field,
+                old_value=str(old_val),
+                new_value=str(new_val),
+            )
+        )
 
     if payload.status is not None:
         old_status = hospital.status.value
         hospital.status = HospitalStatus(payload.status)
-        logs.append(AvailabilityLog(
-            hospital_id=hospital_id,
-            updated_by_user_id=user.id,
-            field_name="status",
-            old_value=old_status,
-            new_value=payload.status,
-        ))
+        logs.append(
+            AvailabilityLog(
+                hospital_id=hospital_id,
+                updated_by_user_id=user.id,
+                field_name="status",
+                old_value=old_status,
+                new_value=payload.status,
+            )
+        )
 
     db.add_all(logs)
     db.commit()
@@ -110,12 +114,17 @@ async def update_availability(
 
     # Re-index in Chroma after availability change
     try:
-        from sqlalchemy import select as sa_select
         from app.models.specialty import HospitalSpecialty
         from app.services.vector.embeddings import index_hospital
-        specs = list(db.scalars(
-            sa_select(HospitalSpecialty.name).where(HospitalSpecialty.hospital_id == hospital_id)
-        ).all())
+        from sqlalchemy import select as sa_select
+
+        specs = list(
+            db.scalars(
+                sa_select(HospitalSpecialty.name).where(
+                    HospitalSpecialty.hospital_id == hospital_id
+                )
+            ).all()
+        )
         parts = [p.strip() for p in hospital.address.split(",")]
         index_hospital(
             hospital_id=hospital_id,
@@ -140,6 +149,7 @@ async def update_availability(
 # ---------------------------------------------------------------------------
 # GET /admin/hospitals/{hospital_id}/availability-logs
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/hospitals/{hospital_id}/availability-logs",
@@ -171,6 +181,7 @@ def get_availability_logs(
 # GET /admin/audit  — global audit log (admin only)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/audit",
     response_model=list[AvailabilityLogOut],
@@ -184,7 +195,9 @@ Requires `admin` role.
 )
 def global_audit(
     hospital_id: int | None = Query(None, description="Filter by hospital"),
-    field_name: str | None = Query(None, description="Filter by field: icu_available | general_available | status"),
+    field_name: str | None = Query(
+        None, description="Filter by field: icu_available | general_available | status"
+    ),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -204,6 +217,7 @@ def global_audit(
 # GET /admin/metrics  — usage metrics (admin only)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/metrics",
     summary="System usage metrics (admin only)",
@@ -217,12 +231,20 @@ def metrics(
     total_users = db.scalar(select(func.count()).select_from(User)) or 0
     total_logs = db.scalar(select(func.count()).select_from(AvailabilityLog)) or 0
 
-    busy = db.scalar(
-        select(func.count()).select_from(Hospital).where(Hospital.status == HospitalStatus.busy)
-    ) or 0
-    emergency_only = db.scalar(
-        select(func.count()).select_from(Hospital).where(Hospital.status == HospitalStatus.emergency_only)
-    ) or 0
+    busy = (
+        db.scalar(
+            select(func.count()).select_from(Hospital).where(Hospital.status == HospitalStatus.busy)
+        )
+        or 0
+    )
+    emergency_only = (
+        db.scalar(
+            select(func.count())
+            .select_from(Hospital)
+            .where(Hospital.status == HospitalStatus.emergency_only)
+        )
+        or 0
+    )
 
     # Recent 5 log entries
     recent_logs = db.scalars(
@@ -232,6 +254,7 @@ def metrics(
     # Vector index stats
     try:
         from app.services.vector.embeddings import get_index_stats
+
         vector_stats = get_index_stats()
     except Exception:
         vector_stats = {"error": "unavailable"}
@@ -254,6 +277,7 @@ def metrics(
 # POST /admin/vector/reindex  — rebuild Chroma index (admin only)
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/vector/reindex",
     summary="Rebuild vector search index (admin only)",
@@ -270,6 +294,7 @@ def reindex_vector(
     user: User = Depends(require_role(UserRole.admin)),
 ) -> dict:
     from app.services.vector.embeddings import index_all_hospitals
+
     count = index_all_hospitals()
     return {"indexed": count, "status": "ok"}
 
@@ -277,6 +302,7 @@ def reindex_vector(
 # ---------------------------------------------------------------------------
 # GET /admin/sessions — chat sessions (admin only)
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/sessions",
@@ -295,15 +321,20 @@ def list_sessions(
     ).all()
     result = []
     for s in sessions:
-        count = db.scalar(
-            select(func.count()).select_from(ChatMessage).where(ChatMessage.session_id == s.id)
-        ) or 0
-        result.append(ChatSessionOut(
-            id=s.id,
-            session_token=s.session_token,
-            created_at=s.created_at,
-            message_count=count,
-        ))
+        count = (
+            db.scalar(
+                select(func.count()).select_from(ChatMessage).where(ChatMessage.session_id == s.id)
+            )
+            or 0
+        )
+        result.append(
+            ChatSessionOut(
+                id=s.id,
+                session_token=s.session_token,
+                created_at=s.created_at,
+                message_count=count,
+            )
+        )
     return result
 
 
@@ -332,6 +363,7 @@ def get_session_messages(
 # ---------------------------------------------------------------------------
 # GET /admin/traces — agent traces (admin only)
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/traces",
