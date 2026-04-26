@@ -8,7 +8,48 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    role: str = "hospital_staff"
+    hospital_id: int | None = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class MeResponse(BaseModel):
+    id: int
+    email: EmailStr
+    role: str
+    hospital_id: int | None = None
+
+
+class UserOut(BaseModel):
+    id: int
+    email: EmailStr
+    role: str
+    hospital_id: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    """Admin can update any user's role or hospital assignment."""
+    role: str | None = None
+    hospital_id: int | None = None
+
+
+class ContactRequest(BaseModel):
+    name: str
+    email: EmailStr
+    subject: str
+    message: str
+
+
+class ContactResponse(BaseModel):
+    status: str
+    message: str
 
