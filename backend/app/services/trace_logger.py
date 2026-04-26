@@ -20,7 +20,7 @@ def log_trace(
     tools_called: dict[str, Any],
     retrievals: dict[str, Any] | None = None,
     final_answer_json: dict[str, Any],
-    model: str = "gemini-1.5-flash",
+    model: str = "gemini-3-flash-preview",
     latency_ms: int = 0,
     safety_flags: dict[str, Any] | None = None,
     db=None,

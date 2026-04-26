@@ -140,7 +140,7 @@ async def triage(
             "confidence": result.confidence,
             "claims": [c.model_dump() for c in result.claims],
         },
-        model="gemini-1.5-flash" if settings.gemini_api_key else "fallback",
+        model="gemini-3-flash-preview" if settings.gemini_api_key else "fallback",
         latency_ms=latency_ms,
         safety_flags={"emergency_keyword_triggered": emergency_triggered},
         db=db,
